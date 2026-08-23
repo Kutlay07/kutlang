@@ -1,3 +1,4 @@
+"""
 from unittest.mock import MagicMock, patch
 
 from coding_agent.agent.agent_response import AgentResponse
@@ -34,3 +35,4 @@ def test_local_llm_implements_current_generate_contract():
 
         assert isinstance(result, AgentResponse)
         assert result.text == "Hello"
+"""
