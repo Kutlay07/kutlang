@@ -1,9 +1,13 @@
-"""
+import pytest
 from unittest.mock import MagicMock, patch
 
 from coding_agent.llm.base_llm import BaseLLM
 from coding_agent.llm.message import Message
 from coding_agent.llm.local import LocalLLM
+from coding_agent.agent.agent_response import AgentResponse
+
+
+pytestmark = pytest.mark.slow
 
 
 def test_local_llm_initializes():
@@ -11,11 +15,11 @@ def test_local_llm_initializes():
     mock_model = MagicMock()
 
     with patch(
-        "coding_agent.llm.local.AutoTokenizer.from_pretrained",
+        "transformers.AutoTokenizer.from_pretrained",
         return_value=mock_tokenizer,
     ) as tokenizer:
         with patch(
-            "coding_agent.llm.local.AutoModelForCausalLM.from_pretrained",
+            "transformers.AutoModelForCausalLM.from_pretrained",
             return_value=mock_model,
         ) as model:
             llm = LocalLLM("test-model")
@@ -32,13 +36,16 @@ def test_local_llm_initializes():
 
 
 def test_local_llm_implements_base_llm():
-    with patch("coding_agent.llm.local.AutoTokenizer.from_pretrained"):
-        with patch(
-            "coding_agent.llm.local.AutoModelForCausalLM.from_pretrained"
-        ):
-            llm = LocalLLM("test-model")
+    with patch(
+        "transformers.AutoTokenizer.from_pretrained",
+        return_value=MagicMock(),
+    ), patch(
+        "transformers.AutoModelForCausalLM.from_pretrained",
+        return_value=MagicMock(),
+    ):
+        llm = LocalLLM("test-model")
 
-            assert isinstance(llm, BaseLLM)
+        assert isinstance(llm, BaseLLM)
 
 
 def test_local_llm_generate():
@@ -54,26 +61,30 @@ def test_local_llm_generate():
     mock_tokenizer.decode.return_value = "Hello world"
 
     with patch(
-        "coding_agent.llm.local.AutoTokenizer.from_pretrained",
+        "transformers.AutoTokenizer.from_pretrained",
         return_value=mock_tokenizer,
     ):
         with patch(
-            "coding_agent.llm.local.AutoModelForCausalLM.from_pretrained",
+            "transformers.AutoModelForCausalLM.from_pretrained",
             return_value=mock_model,
         ):
             llm = LocalLLM("test-model")
 
-            messages = [
-                Message(role="user", content="Hello"),
-            ]
-
-            result = llm.generate(messages)
+            result = llm.generate(
+                [
+                        Message(
+                            role="user",
+                            content="Hello world",
+                        )
+                    ],
+                    [],
+                )
 
             mock_tokenizer.apply_chat_template.assert_called_once_with(
                 [
                     {
                         "role": "user",
-                        "content": "Hello",
+                        "content": "Hello world",
                     }
                 ],
                 return_tensors="pt",
@@ -89,5 +100,5 @@ def test_local_llm_generate():
                 skip_special_tokens=True,
             )
 
-            assert result == "Hello world"
-"""
+            assert isinstance(result, AgentResponse)
+            assert result.text == "Hello world"

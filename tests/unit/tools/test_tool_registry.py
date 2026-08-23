@@ -50,3 +50,4 @@ def test_registry_registers_run_command_tool():
     registry = ToolRegistry([tool])
 
     assert registry.get("run_command") is tool
+    assert tool in registry.tools

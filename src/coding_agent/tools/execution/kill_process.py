@@ -1,3 +1,7 @@
+import os
+import signal
+import subprocess
+
 from ..base_tool import BaseTool
 from .process_manager import ProcessManager
 
@@ -29,9 +33,38 @@ class KillProcessTool(BaseTool):
         }
 
     def execute(self, process_id: int) -> str:
-        process = self.process_manager.get(process_id)
+        managed = self.process_manager.get(process_id)
+        process = managed.process
 
-        process.terminate()
-        self.process_manager.remove(process_id)
+        try:
+            if process.poll() is None:
+                if os.name == "nt":
+                    subprocess.run(
+                        [
+                            "taskkill",
+                            "/PID",
+                            str(process.pid),
+                            "/T",
+                            "/F",
+                        ],
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                else:
+                    os.killpg(
+                        os.getpgid(process.pid),
+                        signal.SIGTERM,
+                    )
 
-        return f"Successfully terminated process: {process_id}"
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
+
+            return f"Successfully terminated process: {process_id}"
+        finally:
+            managed.stdout_path.unlink(missing_ok=True)
+            managed.stderr_path.unlink(missing_ok=True)
+            self.process_manager.remove(process_id)

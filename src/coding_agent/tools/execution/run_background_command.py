@@ -1,7 +1,10 @@
+import os
+from pathlib import Path
 import subprocess
+import tempfile
 
 from ..base_tool import BaseTool
-from .process_manager import ProcessManager
+from .process_manager import ManagedProcess, ProcessManager
 
 
 class RunBackgroundCommandTool(BaseTool):
@@ -31,14 +34,50 @@ class RunBackgroundCommandTool(BaseTool):
         }
 
     def execute(self, command: str) -> str:
-        process = subprocess.Popen(
-            command,
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
+        stdout_file = tempfile.NamedTemporaryFile(
+            mode="w+",
+            encoding="utf-8",
+            delete=False,
+        )
+        stderr_file = tempfile.NamedTemporaryFile(
+            mode="w+",
+            encoding="utf-8",
+            delete=False,
         )
 
-        self.process_manager.add(process)
+        stdout_path = Path(stdout_file.name)
+        stderr_path = Path(stderr_file.name)
+
+        try:
+            creationflags = 0
+
+            if os.name == "nt":
+                creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+
+            process = subprocess.Popen(
+                command,
+                shell=True,
+                stdout=stdout_file,
+                stderr=stderr_file,
+                text=True,
+                creationflags=creationflags,
+            )
+        except Exception:
+            stdout_file.close()
+            stderr_file.close()
+            stdout_path.unlink(missing_ok=True)
+            stderr_path.unlink(missing_ok=True)
+            raise
+        else:
+            stdout_file.close()
+            stderr_file.close()
+
+        self.process_manager.add(
+            ManagedProcess(
+                process=process,
+                stdout_path=stdout_path,
+                stderr_path=stderr_path,
+            )
+        )
 
         return f"Started process: {process.pid}"

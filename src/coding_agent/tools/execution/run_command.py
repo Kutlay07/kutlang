@@ -1,3 +1,5 @@
+import os
+import signal
 import subprocess
 
 from ..base_tool import BaseTool
@@ -32,19 +34,55 @@ class RunCommandTool(BaseTool):
         }
 
     def execute(self, command: str, timeout: int = 30) -> str:
+        creationflags = 0
+
+        if os.name == "nt":
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+
+        process = subprocess.Popen(
+            command,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            creationflags=creationflags,
+        )
+
         try:
-            result = subprocess.run(
-                command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
+            stdout, stderr = process.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
+            self._terminate_process_group(process)
+
+            stdout, stderr = process.communicate()
+
             return f"Command timed out after {timeout} seconds"
 
         return (
-            f"Exit code: {result.returncode}\n"
-            f"STDOUT:\n{result.stdout}"
-            f"STDERR:\n{result.stderr}"
+            f"Exit code: {process.returncode}\n"
+            f"STDOUT:\n{stdout}"
+            f"STDERR:\n{stderr}"
         )
+
+    @staticmethod
+    def _terminate_process_group(process: subprocess.Popen) -> None:
+        if process.poll() is not None:
+            return
+
+        if os.name == "nt":
+            subprocess.run(
+                [
+                    "taskkill",
+                    "/PID",
+                    str(process.pid),
+                    "/T",
+                    "/F",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        else:
+            os.killpg(
+                os.getpgid(process.pid),
+                signal.SIGTERM,
+            )

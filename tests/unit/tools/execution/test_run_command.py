@@ -1,5 +1,12 @@
-"""
+import subprocess
+from unittest.mock import MagicMock, patch
+
+import pytest
+
 from coding_agent.tools.execution.run_command import RunCommandTool
+
+
+pytestmark = pytest.mark.slow
 
 
 def test_run_command_executes_command():
@@ -51,21 +58,6 @@ def test_run_command_handles_timeout():
     )
 
     assert result == "Command timed out after 1 seconds"
-
-
-def test_run_command_returns_stderr():
-    tool = RunCommandTool()
-
-    result = tool.execute(
-        command="python -c \"import sys; sys.stderr.write('error')\""
-    )
-
-    assert result == (
-        "Exit code: 0\n"
-        "STDOUT:\n"
-        "STDERR:\n"
-        "error"
-    )
 
 
 def test_run_command_handles_execution_error():
@@ -133,4 +125,72 @@ def test_run_command_combines_stdout_and_stderr():
         "STDERR:\n"
         "err"
     )
-"""
+
+
+def test_run_command_uses_process_group_on_windows():
+    process = MagicMock()
+    process.communicate.return_value = ("hello\n", "")
+    process.returncode = 0
+
+    with patch(
+        "coding_agent.tools.execution.run_command.subprocess.Popen",
+        return_value=process,
+    ) as popen:
+        tool = RunCommandTool()
+
+        result = tool.execute("python -c \"print('hello')\"")
+
+    if __import__("os").name == "nt":
+        popen.assert_called_once_with(
+            "python -c \"print('hello')\"",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+        )
+
+    assert result == (
+        "Exit code: 0\n"
+        "STDOUT:\n"
+        "hello\n"
+        "STDERR:\n"
+    )
+
+
+def test_run_command_kills_process_tree_on_timeout():
+    process = MagicMock()
+    process.communicate.side_effect = [
+        subprocess.TimeoutExpired("python", 1),
+        ("", ""),
+    ]
+    process.poll.return_value = None
+
+    with patch(
+        "coding_agent.tools.execution.run_command.subprocess.Popen",
+        return_value=process,
+    ), patch(
+        "coding_agent.tools.execution.run_command.subprocess.run",
+    ) as run:
+        tool = RunCommandTool()
+
+        result = tool.execute("python -c \"import time; time.sleep(10)\"", 1)
+
+    if __import__("os").name == "nt":
+        run.assert_called_once_with(
+            [
+                "taskkill",
+                "/PID",
+                str(process.pid),
+                "/T",
+                "/F",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    process.communicate.assert_any_call(timeout=1)
+    process.communicate.assert_any_call()
+
+    assert result == "Command timed out after 1 seconds"

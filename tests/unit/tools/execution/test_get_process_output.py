@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -5,23 +6,35 @@ import pytest
 from coding_agent.tools.execution.get_process_output import (
     GetProcessOutputTool,
 )
-from coding_agent.tools.execution.process_manager import ProcessManager
+from coding_agent.tools.execution.process_manager import (
+    ManagedProcess,
+    ProcessManager,
+)
 
 
-def test_get_process_output_returns_stdout_and_stderr():
+def test_get_process_output_returns_stdout_and_stderr(tmp_path):
     manager = MagicMock(spec=ProcessManager)
     process = MagicMock()
 
-    process.communicate.return_value = (
-        "hello\n",
-        "error",
+    stdout_path = tmp_path / "stdout.txt"
+    stderr_path = tmp_path / "stderr.txt"
+
+    stdout_path.write_text("hello\n", encoding="utf-8")
+    stderr_path.write_text("error", encoding="utf-8")
+
+    managed = ManagedProcess(
+        process=process,
+        stdout_path=stdout_path,
+        stderr_path=stderr_path,
     )
 
-    manager.get.return_value = process
+    manager.get.return_value = managed
 
     tool = GetProcessOutputTool(manager)
 
     result = tool.execute(1234)
+
+    process.wait.assert_called_once_with()
 
     assert result == (
         "STDOUT:\n"
@@ -32,6 +45,39 @@ def test_get_process_output_returns_stdout_and_stderr():
 
     manager.get.assert_called_once_with(1234)
     manager.remove.assert_called_once_with(1234)
+
+    assert not stdout_path.exists()
+    assert not stderr_path.exists()
+
+
+def test_get_process_output_cleans_up_when_read_fails(tmp_path):
+    manager = MagicMock(spec=ProcessManager)
+    process = MagicMock()
+
+    stdout_path = tmp_path / "stdout.txt"
+    stderr_path = tmp_path / "stderr.txt"
+
+    stdout_path.write_text("hello", encoding="utf-8")
+    stderr_path.write_text("error", encoding="utf-8")
+
+    managed = ManagedProcess(
+        process=process,
+        stdout_path=stdout_path,
+        stderr_path=stderr_path,
+    )
+
+    manager.get.return_value = managed
+
+    tool = GetProcessOutputTool(manager)
+
+    stdout_path.unlink()
+
+    with pytest.raises(FileNotFoundError):
+        tool.execute(1234)
+
+    manager.remove.assert_called_once_with(1234)
+
+    assert not stderr_path.exists()
 
 
 def test_get_process_output_raises_for_unknown_process():

@@ -29,13 +29,19 @@ class GetProcessOutputTool(BaseTool):
         }
 
     def execute(self, process_id: int) -> str:
-        process = self.process_manager.get(process_id)
+        managed = self.process_manager.get(process_id)
 
-        stdout, stderr = process.communicate()
+        try:
+            managed.process.wait()
 
-        self.process_manager.remove(process_id)
+            stdout = managed.stdout_path.read_text(encoding="utf-8")
+            stderr = managed.stderr_path.read_text(encoding="utf-8")
 
-        return (
-            f"STDOUT:\n{stdout}"
-            f"STDERR:\n{stderr}"
-        )
+            return (
+                f"STDOUT:\n{stdout}"
+                f"STDERR:\n{stderr}"
+            )
+        finally:
+            managed.stdout_path.unlink(missing_ok=True)
+            managed.stderr_path.unlink(missing_ok=True)
+            self.process_manager.remove(process_id)

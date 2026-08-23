@@ -1,5 +1,3 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
 from .base_llm import BaseLLM
 from .message import Message
 from coding_agent.agent.agent_response import AgentResponse
@@ -8,6 +6,7 @@ from coding_agent.tools.base_tool import BaseTool
 
 class LocalLLM(BaseLLM):
     def __init__(self, model_path: str):
+        from transformers import AutoModelForCausalLM, AutoTokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         self.model = AutoModelForCausalLM.from_pretrained(
             model_path,

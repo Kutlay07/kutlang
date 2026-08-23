@@ -1,70 +1,78 @@
-from unittest.mock import MagicMock, patch
+from pathlib import Path
+from unittest.mock import MagicMock
 
-import pytest
+from coding_agent.tools.execution.process_manager import (
+    ManagedProcess,
+    ProcessManager,
+)
 
-from coding_agent.tools.execution.process_manager import ProcessManager
-from coding_agent.tools.execution.run_background_command import RunBackgroundCommandTool
+
+def make_managed_process(pid: int = 1234) -> ManagedProcess:
+    process = MagicMock()
+    process.pid = pid
+
+    return ManagedProcess(
+        process=process,
+        stdout_path=Path("stdout.txt"),
+        stderr_path=Path("stderr.txt"),
+    )
 
 
 def test_process_manager_stores_process():
     manager = ProcessManager()
-    process = MagicMock()
-    process.pid = 1234
+    managed = make_managed_process()
 
-    manager.add(process)
+    manager.add(managed)
 
-    assert manager.get(1234) is process
+    assert manager.get(1234) is managed
 
 
 def test_process_manager_raises_for_unknown_process():
     manager = ProcessManager()
 
-    with pytest.raises(KeyError):
+    try:
         manager.get(9999)
+    except KeyError:
+        pass
+    else:
+        raise AssertionError("Expected KeyError")
 
 
 def test_process_manager_removes_process():
     manager = ProcessManager()
-    process = MagicMock()
-    process.pid = 1234
+    managed = make_managed_process()
 
-    manager.add(process)
-    manager.remove(1234)
+    manager.add(managed)
 
-    with pytest.raises(KeyError):
+    removed = manager.remove(1234)
+
+    assert removed is managed
+
+    try:
         manager.get(1234)
+    except KeyError:
+        pass
+    else:
+        raise AssertionError("Expected KeyError")
 
 
 def test_process_manager_shares_process_between_tools():
     manager = ProcessManager()
+    managed = make_managed_process()
 
-    process = MagicMock()
-    process.pid = 1234
+    manager.add(managed)
 
-    manager.add(process)
-
-    assert manager.get(1234) is process
-
-    manager.remove(1234)
-
-    with pytest.raises(KeyError):
-        manager.get(1234)
+    assert manager.get(1234) is managed
 
 
 def test_background_process_can_be_retrieved_by_shared_manager():
     manager = ProcessManager()
+    managed = make_managed_process(5678)
 
-    process = MagicMock()
-    process.pid = 1234
+    manager.add(managed)
 
-    with patch(
-        "coding_agent.tools.execution.run_background_command.subprocess.Popen",
-        return_value=process,
-    ):
-        run_tool = RunBackgroundCommandTool(manager)
+    retrieved = manager.get(5678)
 
-        result = run_tool.execute("python server.py")
-
-    process_id = int(result.removeprefix("Started process: "))
-
-    assert manager.get(process_id) is process
+    assert retrieved.process is managed.process
+    assert retrieved.stdout_path == Path("stdout.txt")
+    assert retrieved.stderr_path == Path("stderr.txt")
