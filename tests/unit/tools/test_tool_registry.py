@@ -4,6 +4,7 @@ import pytest
 
 from coding_agent.tools.base_tool import BaseTool
 from coding_agent.tools.tool_registry import ToolRegistry
+from coding_agent.tools.execution.run_command import RunCommandTool
 
 
 def test_registry_stores_tools_by_name():
@@ -42,3 +43,10 @@ def test_registry_exposes_registered_tools():
     registry = ToolRegistry([tool])
 
     assert registry.tools == [tool]
+
+
+def test_registry_registers_run_command_tool():
+    tool = RunCommandTool()
+    registry = ToolRegistry([tool])
+
+    assert registry.get("run_command") is tool

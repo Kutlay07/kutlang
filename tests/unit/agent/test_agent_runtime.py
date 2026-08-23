@@ -9,6 +9,8 @@ from coding_agent.agent.tool_call import ToolCall
 from coding_agent.agent.tool_result import ToolResult
 from coding_agent.llm.message import Message
 from coding_agent.tools.base_tool import BaseTool
+from coding_agent.tools.execution.run_command import RunCommandTool
+from coding_agent.tools.tool_registry import ToolRegistry
 
 
 def test_runtime_initializes_with_llm_and_tools():
@@ -391,3 +393,31 @@ def test_runtime_preserves_assistant_text_with_tool_calls():
 
     assert second_conversation[3].tool_name == "read_file"
     assert second_conversation[3].result == "file contents"
+
+
+from coding_agent.tools.execution.process_manager import ProcessManager
+from coding_agent.tools.execution.run_background_command import (
+    RunBackgroundCommandTool,
+)
+from coding_agent.tools.execution.get_process_output import (
+    GetProcessOutputTool,
+)
+from coding_agent.tools.execution.kill_process import KillProcessTool
+
+
+def test_execution_tools_can_be_registered_together():
+    manager = ProcessManager()
+
+    tools = [
+        RunCommandTool(),
+        RunBackgroundCommandTool(manager),
+        GetProcessOutputTool(manager),
+        KillProcessTool(manager),
+    ]
+
+    registry = ToolRegistry(tools)
+
+    assert registry.get("run_command") is tools[0]
+    assert registry.get("run_background_command") is tools[1]
+    assert registry.get("get_process_output") is tools[2]
+    assert registry.get("kill_process") is tools[3]
