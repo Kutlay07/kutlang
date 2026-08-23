@@ -31,6 +31,7 @@ class AppendFileTool(BaseTool):
         }
 
     def execute(self, path: str, content: str) -> str:
-        Path(path).open("a", encoding="utf-8").write(content)
+        with Path(path).open("a", encoding="utf-8") as file:
+            file.write(content)
 
         return f"Successfully appended content to {path}"
