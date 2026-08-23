@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "lightweight-coding-agent"
+version = "0.1.0"
+description = "A lightweight coding agent with pluggable LLM and tool backends."
+requires-python = ">=3.13"
+dependencies = [
+    "pydantic>=2.0",
+    "pytest",
+    "transformers",
+    "openai",
+]
+
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
