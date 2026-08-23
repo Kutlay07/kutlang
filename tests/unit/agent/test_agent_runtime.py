@@ -347,3 +347,47 @@ def test_runtime_preserves_tool_call_id():
             result="file contents",
         )
     ]
+
+
+def test_runtime_preserves_assistant_text_with_tool_calls():
+    llm = MagicMock(spec=BaseLLM)
+    tools = MagicMock(spec=ToolRegistry)
+
+    tool = MagicMock()
+    tool.execute.return_value = "file contents"
+    tools.get.return_value = tool
+
+    tool_call = ToolCall(
+        call_id="call_123",
+        name="read_file",
+        arguments={"path": "main.py"},
+    )
+
+    llm.generate.side_effect = [
+        AgentResponse(
+            text="I will read the file first.",
+            tool_calls=[tool_call],
+        ),
+        AgentResponse(text="Here is the file."),
+    ]
+
+    runtime = AgentRuntime(llm, tools)
+
+    runtime.run("Read main.py")
+
+    second_conversation = llm.generate.call_args_list[1].args[0]
+
+    assert second_conversation[0] == Message(
+        role="user",
+        content="Read main.py",
+    )
+
+    assert second_conversation[1] == Message(
+        role="assistant",
+        content="I will read the file first.",
+    )
+
+    assert second_conversation[2] == tool_call
+
+    assert second_conversation[3].tool_name == "read_file"
+    assert second_conversation[3].result == "file contents"

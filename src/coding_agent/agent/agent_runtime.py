@@ -35,6 +35,14 @@ class AgentRuntime:
 
             results = self._execute_tool_calls(response)
 
+            if response.text:
+                conversation.append(
+                    Message(
+                        role="assistant",
+                        content=response.text,
+                    )
+                )
+
             conversation.extend(response.tool_calls)
             conversation.extend(results)
 
