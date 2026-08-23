@@ -15,22 +15,30 @@ class OpenAILLM(BaseLLM):
         self.client = OpenAI()
         self.model = model
         
-    def _parse_tool_calls(self, response) -> list[ToolCall]:
+    def _parse_tool_calls(
+        self,
+        response,
+    ) -> tuple[list[ToolCall], str | None]:
         tool_calls = []
 
         for item in response.output:
             if item.type != "function_call":
                 continue
 
+            try:
+                arguments = json.loads(item.arguments)
+            except json.JSONDecodeError:
+                return [], f"Invalid tool arguments for {item.name}"
+
             tool_calls.append(
                 ToolCall(
                     call_id=item.call_id,
                     name=item.name,
-                    arguments=json.loads(item.arguments),
+                    arguments=arguments,
                 )
             )
 
-        return tool_calls
+        return tool_calls, None
     
     def _build_input(self, conversation):
         inputs = []
@@ -84,7 +92,9 @@ class OpenAILLM(BaseLLM):
             ],
         )
 
+        tool_calls, error = self._parse_tool_calls(response)
+
         return AgentResponse(
-            text=response.output_text or None,
-            tool_calls=self._parse_tool_calls(response) or None,
+            text=error or response.output_text or None,
+            tool_calls=tool_calls or None,
         )

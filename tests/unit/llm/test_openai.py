@@ -209,3 +209,35 @@ def test_openai_llm_builds_tool_call_and_result_input():
         )
 
         assert result.text == "Done"
+
+
+def test_openai_llm_handles_malformed_tool_arguments():
+    with patch("coding_agent.llm.openai.OpenAI") as openai:
+        client = openai.return_value
+
+        function_call = MagicMock()
+        function_call.type = "function_call"
+        function_call.call_id = "call_123"
+        function_call.name = "read_file"
+        function_call.arguments = '{"path": "main.py"'
+
+        response = MagicMock()
+        response.output = [function_call]
+        response.output_text = ""
+
+        client.responses.create.return_value = response
+
+        llm = OpenAILLM("gpt-5")
+
+        result = llm.generate(
+            [
+                Message(
+                    role="user",
+                    content="Read main.py",
+                )
+            ],
+            [],
+        )
+
+        assert result.text is not None
+        assert "Invalid tool arguments" in result.text
