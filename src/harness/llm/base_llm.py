@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import TypeAlias
 
-from coding_agent.agent.agent_response import AgentResponse
-from coding_agent.agent.tool_call import ToolCall
-from coding_agent.agent.tool_result import ToolResult
-from coding_agent.tools.base_tool import BaseTool
+from harness.agent.agent_response import AgentResponse
+from harness.agent.tool_call import ToolCall
+from harness.agent.tool_result import ToolResult
+from harness.tools.base_tool import BaseTool
 
 from .message import Message
 

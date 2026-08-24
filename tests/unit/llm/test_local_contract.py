@@ -1,17 +1,19 @@
-"""
+import pytest
 from unittest.mock import MagicMock, patch
 
-from coding_agent.agent.agent_response import AgentResponse
-from coding_agent.llm.base_llm import BaseLLM
-from coding_agent.llm.local import LocalLLM
-from coding_agent.llm.message import Message
+from harness.agent.agent_response import AgentResponse
+from harness.llm.local import LocalLLM
+from harness.llm.message import Message
+
+
+pytestmark = pytest.mark.slow
 
 
 def test_local_llm_implements_current_generate_contract():
     with patch(
-        "coding_agent.llm.local.AutoTokenizer.from_pretrained"
+        "transformers.AutoTokenizer.from_pretrained",
     ) as tokenizer, patch(
-        "coding_agent.llm.local.AutoModelForCausalLM.from_pretrained"
+        "transformers.AutoModelForCausalLM.from_pretrained",
     ) as model:
 
         tokenizer_instance = tokenizer.return_value
@@ -35,4 +37,3 @@ def test_local_llm_implements_current_generate_contract():
 
         assert isinstance(result, AgentResponse)
         assert result.text == "Hello"
-"""

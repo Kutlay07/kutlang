@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from coding_agent.tools.base_tool import BaseTool
-from coding_agent.tools.filesystem.get_current_directory import (
+from harness.tools.base_tool import BaseTool
+from harness.tools.filesystem.get_current_directory import (
     GetCurrentDirectoryTool,
 )
 

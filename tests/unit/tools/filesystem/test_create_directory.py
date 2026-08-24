@@ -1,5 +1,5 @@
-from coding_agent.tools.base_tool import BaseTool
-from coding_agent.tools.filesystem.create_directory import CreateDirectoryTool
+from harness.tools.base_tool import BaseTool
+from harness.tools.filesystem.create_directory import CreateDirectoryTool
 
 
 def test_create_directory_tool_metadata():
@@ -28,7 +28,7 @@ def test_create_directory_tool_execute(tmp_path):
 
 import pytest
 
-from coding_agent.tools.filesystem.create_directory import CreateDirectoryTool
+from harness.tools.filesystem.create_directory import CreateDirectoryTool
 
 
 def test_create_directory_tool_raises_if_directory_exists(tmp_path):

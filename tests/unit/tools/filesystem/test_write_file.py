@@ -1,5 +1,5 @@
-from coding_agent.tools.base_tool import BaseTool
-from coding_agent.tools.filesystem.write_file import WriteFileTool
+from harness.tools.base_tool import BaseTool
+from harness.tools.filesystem.write_file import WriteFileTool
 
 
 def test_write_file_tool_metadata():

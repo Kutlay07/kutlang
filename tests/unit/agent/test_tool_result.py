@@ -1,4 +1,4 @@
-from coding_agent.agent.tool_result import ToolResult
+from harness.agent.tool_result import ToolResult
 
 
 def test_tool_result_stores_tool_name_and_result():

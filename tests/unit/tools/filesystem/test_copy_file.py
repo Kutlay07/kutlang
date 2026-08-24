@@ -1,7 +1,7 @@
 import pytest
 
-from coding_agent.tools.base_tool import BaseTool
-from coding_agent.tools.filesystem.copy_file import CopyFileTool
+from harness.tools.base_tool import BaseTool
+from harness.tools.filesystem.copy_file import CopyFileTool
 
 
 def test_copy_file_tool_metadata():

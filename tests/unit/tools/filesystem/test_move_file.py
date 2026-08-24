@@ -1,7 +1,7 @@
 import pytest
 
-from coding_agent.tools.base_tool import BaseTool
-from coding_agent.tools.filesystem.move_file import MoveFileTool
+from harness.tools.base_tool import BaseTool
+from harness.tools.filesystem.move_file import MoveFileTool
 
 
 def test_move_file_tool_metadata():

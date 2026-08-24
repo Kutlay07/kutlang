@@ -1,7 +1,7 @@
 import pytest
 
-from coding_agent.tools.base_tool import BaseTool
-from coding_agent.tools.filesystem.append_file import AppendFileTool
+from harness.tools.base_tool import BaseTool
+from harness.tools.filesystem.append_file import AppendFileTool
 
 
 def test_append_file_tool_metadata():

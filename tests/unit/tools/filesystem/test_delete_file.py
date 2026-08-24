@@ -1,7 +1,7 @@
 import pytest
 
-from coding_agent.tools.base_tool import BaseTool
-from coding_agent.tools.filesystem.delete_file import DeleteFileTool
+from harness.tools.base_tool import BaseTool
+from harness.tools.filesystem.delete_file import DeleteFileTool
 
 
 def test_delete_file_tool_metadata():

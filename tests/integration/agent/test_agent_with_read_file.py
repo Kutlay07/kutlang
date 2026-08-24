@@ -1,11 +1,11 @@
 from unittest.mock import MagicMock
 
-from coding_agent.agent.agent_response import AgentResponse
-from coding_agent.agent.agent_runtime import AgentRuntime
-from coding_agent.agent.tool_call import ToolCall
-from coding_agent.llm.base_llm import BaseLLM
-from coding_agent.tools.filesystem.read_file import ReadFileTool
-from coding_agent.tools.tool_registry import ToolRegistry
+from harness.agent.agent_response import AgentResponse
+from harness.agent.agent_runtime import AgentRuntime
+from harness.agent.tool_call import ToolCall
+from harness.llm.base_llm import BaseLLM
+from harness.tools.filesystem.read_file import ReadFileTool
+from harness.tools.tool_registry import ToolRegistry
 
 
 def test_agent_runtime_reads_file_with_real_tool(tmp_path):

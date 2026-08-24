@@ -1,7 +1,7 @@
 import pytest
 
-from coding_agent.tools.base_tool import BaseTool
-from coding_agent.tools.filesystem.get_file_info import (
+from harness.tools.base_tool import BaseTool
+from harness.tools.filesystem.get_file_info import (
     GetFileInfoTool,
 )
 

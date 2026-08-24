@@ -1,5 +1,5 @@
-from coding_agent.agent.agent_response import AgentResponse
-from coding_agent.agent.tool_call import ToolCall
+from harness.agent.agent_response import AgentResponse
+from harness.agent.tool_call import ToolCall
 
 
 def test_agent_response_can_contain_text():
