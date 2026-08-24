@@ -2,9 +2,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from coding_agent.tools.base_tool import BaseTool
-from coding_agent.tools.tool_registry import ToolRegistry
-from coding_agent.tools.execution.run_command import RunCommandTool
+from harness.tools.base_tool import BaseTool
+from harness.tools.tool_registry import ToolRegistry
+from harness.tools.execution.run_command import RunCommandTool
 
 
 def test_registry_stores_tools_by_name():

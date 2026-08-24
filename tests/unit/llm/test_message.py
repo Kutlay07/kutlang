@@ -1,4 +1,4 @@
-from coding_agent.llm.message import Message
+from harness.llm.message import Message
 
 
 def test_message_stores_role_and_content():

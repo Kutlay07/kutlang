@@ -1,5 +1,5 @@
-from coding_agent.tools.base_tool import BaseTool
-from coding_agent.tools.filesystem.list_directory import ListDirectoryTool
+from harness.tools.base_tool import BaseTool
+from harness.tools.filesystem.list_directory import ListDirectoryTool
 
 
 def test_list_directory_tool_metadata():

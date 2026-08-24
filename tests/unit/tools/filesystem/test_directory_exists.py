@@ -1,5 +1,5 @@
-from coding_agent.tools.base_tool import BaseTool
-from coding_agent.tools.filesystem.directory_exists import (
+from harness.tools.base_tool import BaseTool
+from harness.tools.filesystem.directory_exists import (
     DirectoryExistsTool,
 )
 

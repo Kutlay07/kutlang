@@ -1,4 +1,4 @@
-from coding_agent.agent.tool_call import ToolCall
+from harness.agent.tool_call import ToolCall
 
 
 def test_tool_call_stores_name_and_arguments():

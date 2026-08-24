@@ -1,5 +1,5 @@
-from coding_agent.tools.base_tool import BaseTool
-from coding_agent.tools.filesystem.file_exists import FileExistsTool
+from harness.tools.base_tool import BaseTool
+from harness.tools.filesystem.file_exists import FileExistsTool
 
 
 def test_file_exists_tool_metadata():

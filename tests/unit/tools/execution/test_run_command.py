@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from coding_agent.tools.execution.run_command import RunCommandTool
+from harness.tools.execution.run_command import RunCommandTool
 
 
 pytestmark = pytest.mark.slow
@@ -133,7 +133,7 @@ def test_run_command_uses_process_group_on_windows():
     process.returncode = 0
 
     with patch(
-        "coding_agent.tools.execution.run_command.subprocess.Popen",
+        "harness.tools.execution.run_command.subprocess.Popen",
         return_value=process,
     ) as popen:
         tool = RunCommandTool()
@@ -167,10 +167,10 @@ def test_run_command_kills_process_tree_on_timeout():
     process.poll.return_value = None
 
     with patch(
-        "coding_agent.tools.execution.run_command.subprocess.Popen",
+        "harness.tools.execution.run_command.subprocess.Popen",
         return_value=process,
     ), patch(
-        "coding_agent.tools.execution.run_command.subprocess.run",
+        "harness.tools.execution.run_command.subprocess.run",
     ) as run:
         tool = RunCommandTool()
 

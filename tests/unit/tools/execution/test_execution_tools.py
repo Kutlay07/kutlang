@@ -1,10 +1,10 @@
-from coding_agent.tools.execution.get_process_output import GetProcessOutputTool
-from coding_agent.tools.execution.kill_process import KillProcessTool
-from coding_agent.tools.execution.process_manager import ProcessManager
-from coding_agent.tools.execution.run_background_command import (
+from harness.tools.execution.get_process_output import GetProcessOutputTool
+from harness.tools.execution.kill_process import KillProcessTool
+from harness.tools.execution.process_manager import ProcessManager
+from harness.tools.execution.run_background_command import (
     RunBackgroundCommandTool,
 )
-from coding_agent.tools.execution.run_command import RunCommandTool
+from harness.tools.execution.run_command import RunCommandTool
 
 
 def test_execution_tools_share_process_manager():

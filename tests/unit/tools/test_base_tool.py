@@ -1,6 +1,6 @@
 import pytest
 
-from coding_agent.tools.base_tool import BaseTool
+from harness.tools.base_tool import BaseTool
 
 
 def test_base_tool_is_abstract():

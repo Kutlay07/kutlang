@@ -1,10 +1,10 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
-from coding_agent.llm.base_llm import BaseLLM
-from coding_agent.llm.message import Message
-from coding_agent.llm.local import LocalLLM
-from coding_agent.agent.agent_response import AgentResponse
+from harness.llm.base_llm import BaseLLM
+from harness.llm.message import Message
+from harness.llm.local import LocalLLM
+from harness.agent.agent_response import AgentResponse
 
 
 pytestmark = pytest.mark.slow

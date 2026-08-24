@@ -1,16 +1,16 @@
 import pytest
 from unittest.mock import MagicMock
 
-from coding_agent.agent.agent_response import AgentResponse
-from coding_agent.agent.agent_runtime import AgentRuntime
-from coding_agent.llm.base_llm import BaseLLM
-from coding_agent.tools.tool_registry import ToolRegistry
-from coding_agent.agent.tool_call import ToolCall
-from coding_agent.agent.tool_result import ToolResult
-from coding_agent.llm.message import Message
-from coding_agent.tools.base_tool import BaseTool
-from coding_agent.tools.execution.run_command import RunCommandTool
-from coding_agent.tools.tool_registry import ToolRegistry
+from harness.agent.agent_response import AgentResponse
+from harness.agent.agent_runtime import AgentRuntime
+from harness.llm.base_llm import BaseLLM
+from harness.tools.tool_registry import ToolRegistry
+from harness.agent.tool_call import ToolCall
+from harness.agent.tool_result import ToolResult
+from harness.llm.message import Message
+from harness.tools.base_tool import BaseTool
+from harness.tools.execution.run_command import RunCommandTool
+from harness.tools.tool_registry import ToolRegistry
 
 
 def test_runtime_initializes_with_llm_and_tools():
@@ -395,14 +395,14 @@ def test_runtime_preserves_assistant_text_with_tool_calls():
     assert second_conversation[3].result == "file contents"
 
 
-from coding_agent.tools.execution.process_manager import ProcessManager
-from coding_agent.tools.execution.run_background_command import (
+from harness.tools.execution.process_manager import ProcessManager
+from harness.tools.execution.run_background_command import (
     RunBackgroundCommandTool,
 )
-from coding_agent.tools.execution.get_process_output import (
+from harness.tools.execution.get_process_output import (
     GetProcessOutputTool,
 )
-from coding_agent.tools.execution.kill_process import KillProcessTool
+from harness.tools.execution.kill_process import KillProcessTool
 
 
 def test_execution_tools_can_be_registered_together():

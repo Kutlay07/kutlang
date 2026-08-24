@@ -1,8 +1,8 @@
-from coding_agent.agent.agent_response import AgentResponse
-from coding_agent.agent.tool_result import ToolResult
-from coding_agent.llm.base_llm import BaseLLM
-from coding_agent.llm.message import Message
-from coding_agent.tools.tool_registry import ToolRegistry
+from harness.agent.agent_response import AgentResponse
+from harness.agent.tool_result import ToolResult
+from harness.llm.base_llm import BaseLLM
+from harness.llm.message import Message
+from harness.tools.tool_registry import ToolRegistry
 
 
 class AgentRuntime:
@@ -15,6 +15,34 @@ class AgentRuntime:
         self.llm = llm
         self.tools = tools
         self.max_iterations = max_iterations
+        
+    def _execute_tool_calls(
+        self,
+        response: AgentResponse,
+    ) -> list[ToolResult]:
+        results = []
+
+        for tool_call in response.tool_calls or []:
+            try:
+                tool = self.tools.get(tool_call.name)
+                result = tool.execute(**tool_call.arguments)
+
+                is_error = False
+
+            except Exception as exc:
+                result = str(exc)
+                is_error = True
+
+            results.append(
+                ToolResult(
+                    call_id=tool_call.call_id,
+                    tool_name=tool_call.name,
+                    result=result,
+                    is_error=is_error,
+                )
+            )
+
+        return results
 
     def run(self, prompt: str) -> AgentResponse:
         conversation = [
@@ -48,30 +76,3 @@ class AgentRuntime:
 
         raise RuntimeError("Maximum agent iterations exceeded")
 
-    def _execute_tool_calls(
-        self,
-        response: AgentResponse,
-    ) -> list[ToolResult]:
-        results = []
-
-        for tool_call in response.tool_calls or []:
-            try:
-                tool = self.tools.get(tool_call.name)
-                result = tool.execute(**tool_call.arguments)
-
-                is_error = False
-
-            except Exception as exc:
-                result = str(exc)
-                is_error = True
-
-            results.append(
-                ToolResult(
-                    call_id=tool_call.call_id,
-                    tool_name=tool_call.name,
-                    result=result,
-                    is_error=is_error,
-                )
-            )
-
-        return results

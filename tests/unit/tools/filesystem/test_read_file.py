@@ -1,5 +1,5 @@
-from coding_agent.tools.base_tool import BaseTool
-from coding_agent.tools.filesystem.read_file import ReadFileTool
+from harness.tools.base_tool import BaseTool
+from harness.tools.filesystem.read_file import ReadFileTool
 
 
 def test_read_file_tool_metadata():

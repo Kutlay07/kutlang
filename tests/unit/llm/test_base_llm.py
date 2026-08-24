@@ -1,7 +1,7 @@
 import pytest
 
-from coding_agent.llm.base_llm import BaseLLM
-from coding_agent.llm.message import Message
+from harness.llm.base_llm import BaseLLM
+from harness.llm.message import Message
 
 
 def test_llm_is_abstract():

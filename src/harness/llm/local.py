@@ -1,7 +1,6 @@
 from .base_llm import BaseLLM
-from .message import Message
-from coding_agent.agent.agent_response import AgentResponse
-from coding_agent.tools.base_tool import BaseTool
+from harness.agent.agent_response import AgentResponse
+from harness.tools.base_tool import BaseTool
 
 
 class LocalLLM(BaseLLM):

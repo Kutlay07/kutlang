@@ -1,7 +1,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from coding_agent.tools.execution.process_manager import (
+from harness.tools.execution.process_manager import (
     ManagedProcess,
     ProcessManager,
 )

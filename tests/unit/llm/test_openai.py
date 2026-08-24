@@ -1,16 +1,16 @@
 from unittest.mock import MagicMock, patch, ANY
 
-from coding_agent.llm.base_llm import BaseLLM
-from coding_agent.llm.message import Message
-from coding_agent.llm.openai import OpenAILLM
-from coding_agent.agent.agent_response import AgentResponse
-from coding_agent.tools.base_tool import BaseTool
-from coding_agent.agent.tool_call import ToolCall
-from coding_agent.agent.tool_result import ToolResult
+from harness.llm.base_llm import BaseLLM
+from harness.llm.message import Message
+from harness.llm.openai import OpenAILLM
+from harness.agent.agent_response import AgentResponse
+from harness.tools.base_tool import BaseTool
+from harness.agent.tool_call import ToolCall
+from harness.agent.tool_result import ToolResult
 
 
 def test_openai_llm_initializes():
-    with patch("coding_agent.llm.openai.OpenAI") as openai:
+    with patch("harness.llm.openai.OpenAI") as openai:
         llm = OpenAILLM("gpt-5")
 
         openai.assert_called_once_with()
@@ -19,14 +19,14 @@ def test_openai_llm_initializes():
 
 
 def test_openai_llm_implements_base_llm():
-    with patch("coding_agent.llm.openai.OpenAI"):
+    with patch("harness.llm.openai.OpenAI"):
         llm = OpenAILLM("gpt-5")
 
         assert isinstance(llm, BaseLLM)
 
 
 def test_openai_llm_generate():
-    with patch("coding_agent.llm.openai.OpenAI") as openai:
+    with patch("harness.llm.openai.OpenAI") as openai:
         client = openai.return_value
 
         response = MagicMock()
@@ -88,7 +88,7 @@ def test_openai_llm_generate():
 
 
 def test_openai_llm_parses_tool_calls():
-    with patch("coding_agent.llm.openai.OpenAI") as openai:
+    with patch("harness.llm.openai.OpenAI") as openai:
         client = openai.return_value
 
         function_call = MagicMock()
@@ -140,7 +140,7 @@ def test_openai_llm_parses_tool_calls():
 
 
 def test_openai_llm_builds_tool_call_and_result_input():
-    with patch("coding_agent.llm.openai.OpenAI") as openai:
+    with patch("harness.llm.openai.OpenAI") as openai:
         client = openai.return_value
 
         response = MagicMock()
@@ -212,7 +212,7 @@ def test_openai_llm_builds_tool_call_and_result_input():
 
 
 def test_openai_llm_handles_malformed_tool_arguments():
-    with patch("coding_agent.llm.openai.OpenAI") as openai:
+    with patch("harness.llm.openai.OpenAI") as openai:
         client = openai.return_value
 
         function_call = MagicMock()

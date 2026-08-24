@@ -1,10 +1,10 @@
 from openai import OpenAI
 import json
 
-from coding_agent.agent.agent_response import AgentResponse
-from coding_agent.tools.base_tool import BaseTool
-from coding_agent.agent.tool_call import ToolCall
-from coding_agent.agent.tool_result import ToolResult
+from harness.agent.agent_response import AgentResponse
+from harness.tools.base_tool import BaseTool
+from harness.agent.tool_call import ToolCall
+from harness.agent.tool_result import ToolResult
 
 from .base_llm import BaseLLM, ConversationItem
 from .message import Message

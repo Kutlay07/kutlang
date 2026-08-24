@@ -3,10 +3,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from coding_agent.tools.execution.get_process_output import (
+from harness.tools.execution.get_process_output import (
     GetProcessOutputTool,
 )
-from coding_agent.tools.execution.process_manager import (
+from harness.tools.execution.process_manager import (
     ManagedProcess,
     ProcessManager,
 )

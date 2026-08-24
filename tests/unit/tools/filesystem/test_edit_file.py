@@ -1,5 +1,5 @@
-from coding_agent.tools.base_tool import BaseTool
-from coding_agent.tools.filesystem.edit_file import EditFileTool
+from harness.tools.base_tool import BaseTool
+from harness.tools.filesystem.edit_file import EditFileTool
 
 
 def test_edit_file_tool_metadata():

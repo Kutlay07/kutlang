@@ -1,12 +1,11 @@
 import os
 import subprocess
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from coding_agent.tools.execution.kill_process import KillProcessTool
-from coding_agent.tools.execution.process_manager import (
+from harness.tools.execution.kill_process import KillProcessTool
+from harness.tools.execution.process_manager import (
     ManagedProcess,
     ProcessManager,
 )
@@ -34,7 +33,7 @@ def test_kill_process_terminates_process_tree(tmp_path):
     tool = KillProcessTool(manager)
 
     with patch(
-        "coding_agent.tools.execution.kill_process.subprocess.run"
+        "harness.tools.execution.kill_process.subprocess.run"
     ) as run:
         result = tool.execute(1234)
 
@@ -68,12 +67,15 @@ def test_kill_process_waits_after_termination(tmp_path):
 
     if os.name == "nt":
         with patch(
-            "coding_agent.tools.execution.kill_process.subprocess.run"
+            "harness.tools.execution.kill_process.subprocess.run"
         ):
             tool.execute(1234)
     else:
         with patch(
-            "coding_agent.tools.execution.kill_process.os.killpg"
+            "harness.tools.execution.kill_process.os.killpg"
+        ), patch(
+            "harness.tools.execution.kill_process.os.getpgid",
+            return_value=1234,
         ):
             tool.execute(1234)
 
@@ -96,12 +98,15 @@ def test_kill_process_falls_back_to_kill(tmp_path):
 
     if os.name == "nt":
         with patch(
-            "coding_agent.tools.execution.kill_process.subprocess.run"
+            "harness.tools.execution.kill_process.subprocess.run"
         ):
             tool.execute(1234)
     else:
         with patch(
-            "coding_agent.tools.execution.kill_process.os.killpg"
+            "harness.tools.execution.kill_process.os.killpg"
+        ), patch(
+            "harness.tools.execution.kill_process.os.getpgid",
+            return_value=1234,
         ):
             tool.execute(1234)
 
