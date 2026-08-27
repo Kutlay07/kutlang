@@ -252,3 +252,5 @@ Thumbs.db
 
 # Local models
 models/
+
+.freebuff/

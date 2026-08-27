@@ -1,28 +1,37 @@
 from fastapi import Depends
 
-from ..agent.agent_runtime import AgentRuntime
-from ..llm.base_llm import BaseLLM
-from ..llm.openai import OpenAILLM
-from ..tools.tool_registry import ToolRegistry
-from config import settings
-
+from harness.agent.agent_runtime import AgentRuntime
+from harness.config import settings
+from harness.llm.base_llm import BaseLLM
+from harness.llm.local import LocalLLM
+from harness.llm.openai import OpenAILLM
+from harness.tools.entry_point_tool_discovery import EntryPointToolDiscovery
+from harness.tools.tool_registry import ToolRegistry
 
 
 def get_llm() -> BaseLLM:
-    return OpenAILLM()
-
+    return LocalLLM(model_path=settings.MODEL_PATH)
 
 
 def get_tool_registry() -> ToolRegistry:
-    return ToolRegistry(
-        
-    )
+    discovery = EntryPointToolDiscovery()
+    providers = discovery.discover()
 
+    tools = [
+        tool
+        for provider in providers
+        for tool in provider.get_tools()
+    ]
+
+    return ToolRegistry(tools)
 
 
 def get_agent_runtime(
     llm: BaseLLM = Depends(get_llm),
     registry: ToolRegistry = Depends(get_tool_registry),
-    max_iterations: int = settings.MAX_ITERATIONS,
 ) -> AgentRuntime:
-    return AgentRuntime(llm, registry, max_iterations)
+    return AgentRuntime(
+        llm=llm,
+        tools=registry,
+        max_iterations=settings.MAX_ITERATIONS,
+    )

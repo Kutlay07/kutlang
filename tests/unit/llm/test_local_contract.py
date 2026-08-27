@@ -1,39 +1,34 @@
-import pytest
 from unittest.mock import MagicMock, patch
 
 from harness.agent.agent_response import AgentResponse
+from harness.llm.base_llm import BaseLLM
 from harness.llm.local import LocalLLM
 from harness.llm.message import Message
 
 
-pytestmark = pytest.mark.slow
-
-
 def test_local_llm_implements_current_generate_contract():
-    with patch(
-        "transformers.AutoTokenizer.from_pretrained",
-    ) as tokenizer, patch(
-        "transformers.AutoModelForCausalLM.from_pretrained",
-    ) as model:
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = "Hello"
 
-        tokenizer_instance = tokenizer.return_value
-        model_instance = model.return_value
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_response
 
-        tokenizer_instance.apply_chat_template.return_value = MagicMock()
-        model_instance.generate.return_value = [[1, 2, 3]]
-        tokenizer_instance.decode.return_value = "Hello"
-
-        llm = LocalLLM("test-model")
+    with patch("harness.llm.local.OpenAI", return_value=mock_client):
+        llm = LocalLLM(
+            base_url="http://test/v1",
+            model="test-model",
+        )
 
         result = llm.generate(
-    [
-        Message(
-            role="user",
-            content="Hello",
+            [
+                Message(
+                    role="user",
+                    content="Hello",
+                )
+            ],
+            [],
         )
-    ],
-    [],
-    )
 
-        assert isinstance(result, AgentResponse)
-        assert result.text == "Hello"
+    assert isinstance(llm, BaseLLM)
+    assert isinstance(result, AgentResponse)
+    assert result.text == "Hello"

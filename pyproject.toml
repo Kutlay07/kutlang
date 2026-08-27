@@ -12,6 +12,7 @@ dependencies = [
     "pydantic>=2.0",
     "pytest",
     "transformers",
+    "llama-cpp-python",
     "openai",
     "fastapi[standard]",
 ]
