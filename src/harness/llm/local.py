@@ -25,36 +25,46 @@ class LocalLLM(BaseLLM):
 
     def _build_input(self, conversation):
         messages = []
-        
+        tool_calls = []
+
+        def flush_tool_calls():
+            if tool_calls:
+                messages.append({
+                    "role": "assistant",
+                    "tool_calls": tool_calls.copy(),
+                })
+                tool_calls.clear()
+
         for item in conversation:
             if isinstance(item, Message):
+                flush_tool_calls()
+
                 messages.append({
                     "role": item.role,
                     "content": item.content,
                 })
-                
+
             elif isinstance(item, ToolCall):
-                messages.append({
-                    "role": "assistant",
-                    "tool_calls": [
-                        {
-                            "id": item.call_id,
-                            "type": "function",
-                            "function": {
-                                "name": item.name,
-                                "arguments": json.dumps(item.arguments),
-                            },
-                        }
-                    ],
+                tool_calls.append({
+                    "id": item.call_id,
+                    "type": "function",
+                    "function": {
+                        "name": item.name,
+                        "arguments": json.dumps(item.arguments),
+                    },
                 })
-                
+
             elif isinstance(item, ToolResult):
+                flush_tool_calls()
+
                 messages.append({
                     "role": "tool",
                     "tool_call_id": item.call_id,
                     "content": item.result,
                 })
-                
+
+        flush_tool_calls()
+
         return messages
 
 
@@ -76,13 +86,16 @@ class LocalLLM(BaseLLM):
 
     def _parse_tool_calls(self, response):
         tool_calls = []
-        
+
         for item in response.choices[0].message.tool_calls or []:
             try:
+                if not isinstance(item.function.arguments, str):
+                    raise TypeError
+
                 arguments = json.loads(item.function.arguments)
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, TypeError):
                 return [], f"Invalid tool arguments for {item.function.name}"
-            
+
             tool_calls.append(
                 ToolCall(
                     call_id=item.id,
@@ -90,7 +103,7 @@ class LocalLLM(BaseLLM):
                     arguments=arguments,
                 )
             )
-            
+
         return tool_calls, None
 
 

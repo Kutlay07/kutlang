@@ -199,3 +199,59 @@ def test_parse_tool_calls():
     assert tool_call.arguments == {"path": "test.py"}
 
     assert error is None
+
+
+def test_build_input_groups_multiple_tool_calls():
+    llm = LocalLLM(
+        base_url="http://test/v1",
+        model="test-model",
+    )
+
+    tool_calls = [
+        ToolCall(
+            call_id="call_1",
+            name="read_file",
+            arguments={"path": "a.py"},
+        ),
+        ToolCall(
+            call_id="call_2",
+            name="read_file",
+            arguments={"path": "b.py"},
+        ),
+    ]
+
+    built = llm._build_input(tool_calls)
+
+    assert len(built) == 1
+
+    message = built[0]
+
+    assert message["role"] == "assistant"
+    assert len(message["tool_calls"]) == 2
+
+    assert message["tool_calls"][0]["id"] == "call_1"
+    assert message["tool_calls"][1]["id"] == "call_2"
+
+
+@pytest.mark.parametrize("arguments", [None, 123, {}, []])
+def test_parse_tool_calls_rejects_non_string_arguments(arguments):
+    llm = LocalLLM(
+        base_url="http://test/v1",
+        model="test-model",
+    )
+
+    function = MagicMock()
+    function.name = "read_file"
+    function.arguments = arguments
+
+    tool_call = MagicMock()
+    tool_call.id = "call_123"
+    tool_call.function = function
+
+    response = MagicMock()
+    response.choices[0].message.tool_calls = [tool_call]
+
+    tool_calls, error = llm._parse_tool_calls(response)
+
+    assert tool_calls == []
+    assert error == "Invalid tool arguments for read_file"
