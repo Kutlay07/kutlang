@@ -10,31 +10,32 @@ def test_chat_endpoint():
         def run(self, prompt):
             assert prompt == "Hello"
             return AgentResponse(text="Hello back")
-        
+
     app.dependency_overrides[get_agent_runtime] = lambda: FakeRuntime()
-    
-    client = TestClient(app)
-    
-    response = client.post(
-        "/chat",
-        json={"prompt": "Hello"},
-    )
-    
-    assert response.status_code == 200
-    assert response.json() == {
-        "text": "Hello back",
-        "tool_calls": None,
-    }
-    
-    app.dependency_overrides.clear()
+
+    try:
+        client = TestClient(app)
+
+        response = client.post(
+            "/chat",
+            json={"prompt": "Hello"},
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "text": "Hello back",
+            "tool_calls": None,
+        }
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_chat_request_validation():
     client = TestClient(app)
-    
+
     response = client.post(
         "/chat",
         json={},
     )
-    
+
     assert response.status_code == 422
