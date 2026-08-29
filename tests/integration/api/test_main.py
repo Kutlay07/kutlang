@@ -31,6 +31,12 @@ def test_chat_endpoint():
 
 
 def test_chat_request_validation():
+    class FakeRuntime:
+        def run(self, prompt):
+            return AgentResponse(text="unused")
+
+    app.dependency_overrides[get_agent_runtime] = lambda: FakeRuntime()
+
     client = TestClient(app)
 
     response = client.post(
@@ -39,3 +45,5 @@ def test_chat_request_validation():
     )
 
     assert response.status_code == 422
+
+    app.dependency_overrides.clear()
