@@ -5,100 +5,253 @@ from harness.llm.base_llm import BaseLLM
 from harness.llm.message import Message
 from harness.llm.local import LocalLLM
 from harness.agent.agent_response import AgentResponse
+from harness.agent.tool_call import ToolCall
+from harness.agent.tool_result import ToolResult
+from harness.tools.base_tool import BaseTool
 
-
-pytestmark = pytest.mark.slow
 
 
 def test_local_llm_initializes():
-    mock_tokenizer = MagicMock()
-    mock_model = MagicMock()
-
-    with patch(
-        "transformers.AutoTokenizer.from_pretrained",
-        return_value=mock_tokenizer,
-    ) as tokenizer:
-        with patch(
-            "transformers.AutoModelForCausalLM.from_pretrained",
-            return_value=mock_model,
-        ) as model:
-            llm = LocalLLM("test-model")
-
-            tokenizer.assert_called_once_with("test-model")
-
-            model.assert_called_once_with(
-                "test-model",
-                device_map="auto",
-            )
-
-            assert llm.tokenizer is mock_tokenizer
-            assert llm.model is mock_model
+    with patch("harness.llm.local.OpenAI") as openai:
+        llm = LocalLLM(
+            base_url="http://test/v1",
+            model="test-model",
+        )
+        
+        openai.assert_called_once_with(
+            base_url="http://test/v1",
+            api_key="not-needed",
+        )
+        
+        assert llm.base_url == "http://test/v1"
+        assert llm.model == "test-model"
 
 
 def test_local_llm_implements_base_llm():
-    with patch(
-        "transformers.AutoTokenizer.from_pretrained",
-        return_value=MagicMock(),
-    ), patch(
-        "transformers.AutoModelForCausalLM.from_pretrained",
-        return_value=MagicMock(),
-    ):
-        llm = LocalLLM("test-model")
-
+    with patch("harness.llm.local.OpenAI"):
+        llm = LocalLLM(
+            base_url="http://test/v1",
+            model="test-model",
+        )
+        
         assert isinstance(llm, BaseLLM)
 
 
 def test_local_llm_generate():
-    mock_tokenizer = MagicMock()
-    mock_model = MagicMock()
-
-    mock_inputs = MagicMock()
-    mock_tokenizer.apply_chat_template.return_value = mock_inputs
-
-    mock_outputs = [[1, 2, 3, 4]]
-    mock_model.generate.return_value = mock_outputs
-
-    mock_tokenizer.decode.return_value = "Hello world"
-
-    with patch(
-        "transformers.AutoTokenizer.from_pretrained",
-        return_value=mock_tokenizer,
-    ):
-        with patch(
-            "transformers.AutoModelForCausalLM.from_pretrained",
-            return_value=mock_model,
-        ):
-            llm = LocalLLM("test-model")
-
-            result = llm.generate(
-                [
-                        Message(
-                            role="user",
-                            content="Hello world",
-                        )
-                    ],
-                    [],
-                )
-
-            mock_tokenizer.apply_chat_template.assert_called_once_with(
-                [
-                    {
-                        "role": "user",
-                        "content": "Hello world",
-                    }
-                ],
-                return_tensors="pt",
-                add_generation_prompt=True,
+    mock_client = MagicMock()
+    mock_response = MagicMock()
+    
+    mock_response.choices[0].message.content = "Hello world"
+    
+    mock_client.chat.completions.create.return_value = mock_response
+    
+    llm = LocalLLM(
+        base_url="http://test/v1",
+        model="test-model",
+    )
+    
+    llm.client = mock_client
+    
+    result = llm.generate(
+        [
+            Message(
+                role="user",
+                content="Hello world",
             )
+        ],
+        [],
+    )
+    
+    mock_client.chat.completions.create.assert_called_once_with(
+        model="test-model",
+        messages=[
+            {
+                "role": "user",
+                "content": "Hello world",
+            }
+        ],
+        tools=[],
+    )
+    
+    assert isinstance(result, AgentResponse)
+    assert result.text == "Hello world"
 
-            mock_model.generate.assert_called_once_with(
-                mock_inputs
-            )
 
-            mock_tokenizer.decode.assert_called_once_with(
-                mock_outputs[0],
-                skip_special_tokens=True,
-            )
+def test_build_input():
+    llm = LocalLLM(
+        base_url="http://test/v1",
+        model="test-model",
+    )
+    
+    tool_call = ToolCall(
+        call_id="call_123",
+        name="read_file",
+        arguments={"path": "test.py"},
+    )
+    
+    built = llm._build_input([tool_call])
+    
+    assert len(built) == 1
 
-            assert isinstance(result, AgentResponse)
-            assert result.text == "Hello world"
+    message = built[0]
+
+    assert message["role"] == "assistant"
+    assert message["tool_calls"][0]["id"] == "call_123"
+    assert message["tool_calls"][0]["type"] == "function"
+    assert message["tool_calls"][0]["function"]["name"] == "read_file"
+    assert message["tool_calls"][0]["function"]["arguments"] == '{"path": "test.py"}'
+
+
+def test_tool_result_build_input():
+    llm = LocalLLM(
+        base_url="http://test/v1",
+        model="test-model",
+    )
+        
+    tool_result = ToolResult(
+        call_id="call_123",
+        tool_name="read_file",
+        result="file contents",
+        is_error=False,
+    )
+    
+    built = llm._build_input([tool_result])
+    
+    assert len(built) == 1
+    
+    message = built[0]
+    
+    assert message["role"] == "tool"
+    assert message["tool_call_id"] == "call_123"
+    assert message["content"] == "file contents"
+
+
+def test_format_tools():
+    class FakeTool(BaseTool):
+        @property
+        def name(self):
+            return "read_file"
+
+        @property
+        def description(self):
+            return "Read a file"
+
+        @property
+        def parameters(self):
+            return {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"}
+                }
+            }
+
+        def execute(self, **kwargs):
+            return "..."
+        
+    llm = LocalLLM(
+        base_url="http://test/v1",
+        model="test-model",
+    )
+    formatted = llm._format_tools([FakeTool()])
+    
+    assert len(formatted) == 1
+
+    tool = formatted[0]
+
+    assert tool["type"] == "function"
+    assert tool["function"]["name"] == "read_file"
+    assert tool["function"]["description"] == "Read a file"
+    assert tool["function"]["parameters"] == {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string"}
+        }
+    }
+
+
+def test_parse_tool_calls():
+    llm = LocalLLM(
+        base_url="http://test/v1",
+        model="test-model",
+    )
+
+    function = MagicMock()
+    function.name = "read_file"
+    function.arguments = '{"path": "test.py"}'
+
+    tool_call = MagicMock()
+    tool_call.id = "call_123"
+    tool_call.function = function
+    
+    response = MagicMock()
+    response.choices[0].message.tool_calls = [tool_call]
+
+    
+    tool_calls, error = llm._parse_tool_calls(response)
+
+    assert len(tool_calls) == 1
+
+    tool_call = tool_calls[0]
+
+    assert isinstance(tool_call, ToolCall)
+    assert tool_call.call_id == "call_123"
+    assert tool_call.name == "read_file"
+    assert tool_call.arguments == {"path": "test.py"}
+
+    assert error is None
+
+
+def test_build_input_groups_multiple_tool_calls():
+    llm = LocalLLM(
+        base_url="http://test/v1",
+        model="test-model",
+    )
+
+    tool_calls = [
+        ToolCall(
+            call_id="call_1",
+            name="read_file",
+            arguments={"path": "a.py"},
+        ),
+        ToolCall(
+            call_id="call_2",
+            name="read_file",
+            arguments={"path": "b.py"},
+        ),
+    ]
+
+    built = llm._build_input(tool_calls)
+
+    assert len(built) == 1
+
+    message = built[0]
+
+    assert message["role"] == "assistant"
+    assert len(message["tool_calls"]) == 2
+
+    assert message["tool_calls"][0]["id"] == "call_1"
+    assert message["tool_calls"][1]["id"] == "call_2"
+
+
+@pytest.mark.parametrize("arguments", [None, 123, {}, []])
+def test_parse_tool_calls_rejects_non_string_arguments(arguments):
+    llm = LocalLLM(
+        base_url="http://test/v1",
+        model="test-model",
+    )
+
+    function = MagicMock()
+    function.name = "read_file"
+    function.arguments = arguments
+
+    tool_call = MagicMock()
+    tool_call.id = "call_123"
+    tool_call.function = function
+
+    response = MagicMock()
+    response.choices[0].message.tool_calls = [tool_call]
+
+    tool_calls, error = llm._parse_tool_calls(response)
+
+    assert tool_calls == []
+    assert error == "Invalid tool arguments for read_file"
