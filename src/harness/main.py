@@ -1,16 +1,8 @@
-from fastapi import FastAPI
-from contextlib import asynccontextmanager
+from fastapi import FastAPI, Depends
 
+from harness.application.dependencies import get_agent_runtime
+from harness.api.schemas.chat_request import ChatRequest
 from harness.agent.agent_runtime import AgentRuntime
-from harness.llm.local import LocalLLM
-from harness.tools.base_tool import BaseTool
-from harness.tools.tool_registry import ToolRegistry
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    pass
-
 
 
 app = FastAPI(
@@ -22,5 +14,12 @@ app = FastAPI(
     license_info={
         "name": "MIT",
     },
-    lifespan=lifespan,
 )
+
+
+@app.post("/chat")
+def chat(
+    request: ChatRequest,
+    runtime: AgentRuntime = Depends(get_agent_runtime),
+):
+    return runtime.run(request.prompt)

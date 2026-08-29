@@ -15,6 +15,7 @@ dependencies = [
     "llama-cpp-python",
     "openai",
     "fastapi[standard]",
+    "pydantic-settings>=2.0",
 ]
 
 

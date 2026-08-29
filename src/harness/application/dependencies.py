@@ -4,13 +4,12 @@ from harness.agent.agent_runtime import AgentRuntime
 from harness.config import settings
 from harness.llm.base_llm import BaseLLM
 from harness.llm.local import LocalLLM
-from harness.llm.openai import OpenAILLM
 from harness.tools.entry_point_tool_discovery import EntryPointToolDiscovery
 from harness.tools.tool_registry import ToolRegistry
 
 
 def get_llm() -> BaseLLM:
-    return LocalLLM(model_path=settings.MODEL_PATH)
+    return LocalLLM(base_url=settings.local_llm_base_url, model=settings.local_llm_model)
 
 
 def get_tool_registry() -> ToolRegistry:
@@ -33,5 +32,5 @@ def get_agent_runtime(
     return AgentRuntime(
         llm=llm,
         tools=registry,
-        max_iterations=settings.MAX_ITERATIONS,
+        max_iterations=settings.max_iterations,
     )
