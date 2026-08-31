@@ -9,7 +9,7 @@ def test_approval_scope_requires_tool_name():
     assert scope.tool_name == "read"
 
 
-@pytest.mark.parametrize("tool_name", ["", "  "])
-def test_approval_scope_rejects_empty_tool_name(tool_name):
+@pytest.mark.parametrize("tool_name", ["", "  ", None, 123])
+def test_approval_scope_rejects_invalid_tool_name(tool_name):
     with pytest.raises(ValueError):
         ApprovalScope(tool_name=tool_name)
