@@ -32,7 +32,7 @@ def get_tool_registry(
     providers = []
     
     for provider_class in provider_classes:
-        if provider_class is FilesystemToolProvider:
+        if issubclass(provider_class, FilesystemToolProvider):
             providers.append(provider_class(boundary))
         else:
             providers.append(provider_class())

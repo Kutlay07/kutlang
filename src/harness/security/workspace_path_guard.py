@@ -12,6 +12,6 @@ class WorkspacePathGuard:
         resolved = (self.workspace_root / path).resolve()
         
         if not resolved.is_relative_to(self.workspace_root):
-            raise WorkspaceBoundaryViolation("Path is outside the workspace boundary")
+            raise WorkspaceBoundaryViolation(f"Path is outside the workspace boundary {path}")
         
         return resolved
