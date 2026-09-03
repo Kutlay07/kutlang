@@ -1,9 +1,13 @@
-from pathlib import Path
+from harness.security.workspace_boundary import WorkspaceBoundary
 
 from ..base_tool import BaseTool
 
 
 class ReadFileRangeTool(BaseTool):
+    
+    def __init__(self, workspace_boundary: WorkspaceBoundary):
+        self.workspace_boundary = workspace_boundary
+    
     @property
     def name(self) -> str:
         return "read_file_range"
@@ -40,12 +44,13 @@ class ReadFileRangeTool(BaseTool):
         start_line: int,
         end_line: int,
     ) -> str:
+        validated_path = self.workspace_boundary.validate(path)
         if start_line < 1:
             raise ValueError("start_line must be at least 1")
 
         if end_line < start_line:
             raise ValueError("end_line must be greater than or equal to start_line")
 
-        lines = Path(path).read_text(encoding="utf-8").splitlines()
+        lines = validated_path.read_text(encoding="utf-8").splitlines()
 
         return "\n".join(lines[start_line - 1:end_line])

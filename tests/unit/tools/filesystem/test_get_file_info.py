@@ -6,8 +6,8 @@ from harness.tools.filesystem.get_file_info import (
 )
 
 
-def test_get_file_info_tool_metadata():
-    tool = GetFileInfoTool()
+def test_get_file_info_tool_metadata(workspace_boundary):
+    tool = GetFileInfoTool(workspace_boundary)
 
     assert tool.name == "get_file_info"
     assert tool.description == (
@@ -15,17 +15,17 @@ def test_get_file_info_tool_metadata():
     )
 
 
-def test_get_file_info_tool_implements_base_tool():
-    tool = GetFileInfoTool()
+def test_get_file_info_tool_implements_base_tool(workspace_boundary):
+    tool = GetFileInfoTool(workspace_boundary)
 
     assert isinstance(tool, BaseTool)
 
 
-def test_get_file_info_tool_returns_file_info(tmp_path):
+def test_get_file_info_tool_returns_file_info(tmp_path, workspace_boundary):
     file = tmp_path / "test.txt"
     file.write_text("Hello", encoding="utf-8")
 
-    tool = GetFileInfoTool()
+    tool = GetFileInfoTool(workspace_boundary)
 
     result = tool.execute(path=str(file))
 
@@ -33,19 +33,19 @@ def test_get_file_info_tool_returns_file_info(tmp_path):
     assert "size: 5" in result
 
 
-def test_get_file_info_tool_returns_directory_info(tmp_path):
+def test_get_file_info_tool_returns_directory_info(tmp_path, workspace_boundary):
     directory = tmp_path / "src"
     directory.mkdir()
 
-    tool = GetFileInfoTool()
+    tool = GetFileInfoTool(workspace_boundary)
 
     result = tool.execute(path=str(directory))
 
     assert "type: directory" in result
 
 
-def test_get_file_info_tool_raises_for_missing_path(tmp_path):
-    tool = GetFileInfoTool()
+def test_get_file_info_tool_raises_for_missing_path(tmp_path, workspace_boundary):
+    tool = GetFileInfoTool(workspace_boundary)
 
     with pytest.raises(FileNotFoundError):
         tool.execute(

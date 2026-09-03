@@ -16,7 +16,7 @@ def test_entry_point_discovery_finds_expected_providers():
     
     providers = discovery.discover()
     
-    assert {type(provider).__name__ for provider in providers} == {
+    assert {provider.__name__ for provider in providers} == {
         "FilesystemToolProvider",
         "ExecutionToolProvider",
     }
@@ -27,6 +27,4 @@ def test_entry_point_discovery_returns_tool_providers():
     
     providers = discovery.discover()
     
-    assert all(isinstance(provider, ToolProvider) for provider in providers)
-
-
+    assert all(issubclass(provider, ToolProvider) for provider in providers)

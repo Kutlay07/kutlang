@@ -1,9 +1,13 @@
-from pathlib import Path
+from harness.security.workspace_boundary import WorkspaceBoundary
 
 from ..base_tool import BaseTool
 
 
 class GetFileInfoTool(BaseTool):
+    
+    def __init__(self, workspace_boundary: WorkspaceBoundary):
+        self.workspace_boundary = workspace_boundary
+        
     @property
     def name(self) -> str:
         return "get_file_info"
@@ -27,21 +31,21 @@ class GetFileInfoTool(BaseTool):
         }
 
     def execute(self, path: str) -> str:
-        target = Path(path)
+        validated_path = self.workspace_boundary.validate(path)
 
-        if not target.exists():
+        if not validated_path.exists():
             raise FileNotFoundError(f"Path not found: {path}")
 
-        if target.is_file():
+        if validated_path.is_file():
             return (
                 f"type: file\n"
-                f"size: {target.stat().st_size}"
+                f"size: {validated_path.stat().st_size}"
             )
 
-        if target.is_dir():
+        if validated_path.is_dir():
             return (
                 f"type: directory\n"
-                f"size: {target.stat().st_size}"
+                f"size: {validated_path.stat().st_size}"
             )
 
         return "type: other"

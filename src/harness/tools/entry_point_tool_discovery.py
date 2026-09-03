@@ -5,13 +5,12 @@ from harness.tools.tool_provider import ToolProvider
 
 
 class EntryPointToolDiscovery(ToolDiscovery):
-    
-    def discover(self, ) -> list[ToolProvider]:
+
+    def discover(self) -> list[type[ToolProvider]]:
         providers = []
-        
+
         for ep in entry_points(group="harness.tools"):
             provider_class = ep.load()
-            provider = provider_class()
-            providers.append(provider)
-        
+            providers.append(provider_class)
+
         return providers
