@@ -1,4 +1,5 @@
 from harness.tools.base_tool import BaseTool
+from harness.security.workspace_boundary import WorkspaceBoundary
 from harness.tools.filesystem.append_file import AppendFileTool
 from harness.tools.filesystem.copy_file import CopyFileTool
 from harness.tools.filesystem.create_directory import CreateDirectoryTool
@@ -18,20 +19,23 @@ from harness.tools.tool_provider import ToolProvider
 
 class FilesystemToolProvider(ToolProvider):
     
+    def __init__(self, workspace_boundary: WorkspaceBoundary):
+        self.workspace_boundary = workspace_boundary
+    
     def get_tools(self) -> list[BaseTool]:
         return [
-            AppendFileTool(),
-            CopyFileTool(),
-            CreateDirectoryTool(),
-            DeleteDirectoryTool(),
-            DeleteFileTool(),
-            DirectoryExistsTool(),
-            EditFileTool(),
-            FileExistsTool(),
+            AppendFileTool(self.workspace_boundary),
+            CopyFileTool(self.workspace_boundary),
+            CreateDirectoryTool(self.workspace_boundary),
+            DeleteDirectoryTool(self.workspace_boundary),
+            DeleteFileTool(self.workspace_boundary),
+            DirectoryExistsTool(self.workspace_boundary),
+            EditFileTool(self.workspace_boundary),
+            FileExistsTool(self.workspace_boundary),
             GetCurrentDirectoryTool(),
-            GetFileInfoTool(),
-            ListDirectoryTool(),
-            MoveFileTool(),
-            ReadFileTool(),
-            WriteFileTool(),
+            GetFileInfoTool(self.workspace_boundary),
+            ListDirectoryTool(self.workspace_boundary),
+            MoveFileTool(self.workspace_boundary),
+            ReadFileTool(self.workspace_boundary),
+            WriteFileTool(self.workspace_boundary),
         ]

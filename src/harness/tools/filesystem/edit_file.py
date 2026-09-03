@@ -1,9 +1,13 @@
-from pathlib import Path
+from harness.security.workspace_boundary import WorkspaceBoundary
 
 from ..base_tool import BaseTool
 
 
 class EditFileTool(BaseTool):
+    
+    def __init__(self, workspace_boundary: WorkspaceBoundary):
+        self.workspace_boundary = workspace_boundary
+    
     @property
     def name(self) -> str:
         return "edit_file"
@@ -40,13 +44,14 @@ class EditFileTool(BaseTool):
         old_text: str,
         new_text: str,
     ) -> str:
-        file = Path(path)
-        content = file.read_text(encoding="utf-8")
+        validated_path = self.workspace_boundary.validate(path)
+
+        content = validated_path.read_text(encoding="utf-8")
 
         if old_text not in content:
             raise ValueError("Text to replace was not found in the file")
 
-        file.write_text(
+        validated_path.write_text(
             content.replace(old_text, new_text, 1),
             encoding="utf-8",
         )

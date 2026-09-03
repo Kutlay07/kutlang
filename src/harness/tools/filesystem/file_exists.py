@@ -1,9 +1,13 @@
-from pathlib import Path
+from harness.security.workspace_boundary import WorkspaceBoundary
 
 from ..base_tool import BaseTool
 
 
 class FileExistsTool(BaseTool):
+    
+    def __init__(self, workspace_boundary: WorkspaceBoundary):
+        self.workspace_boundary = workspace_boundary
+    
     @property
     def name(self) -> str:
         return "file_exists"
@@ -27,4 +31,5 @@ class FileExistsTool(BaseTool):
         }
 
     def execute(self, path: str) -> str:
-        return str(Path(path).is_file()).lower()
+        validated_path = self.workspace_boundary.validate(path)
+        return str(validated_path.is_file()).lower()

@@ -1,9 +1,13 @@
-from pathlib import Path
+from harness.security.workspace_boundary import WorkspaceBoundary
 
 from ..base_tool import BaseTool
 
 
 class DeleteFileTool(BaseTool):
+    
+    def __init__(self, workspace_boundary: WorkspaceBoundary):
+        self.workspace_boundary = workspace_boundary
+    
     @property
     def name(self) -> str:
         return "delete_file"
@@ -27,11 +31,11 @@ class DeleteFileTool(BaseTool):
         }
 
     def execute(self, path: str) -> str:
-        file = Path(path)
+        validated_path = self.workspace_boundary.validate(path)
 
-        if not file.is_file():
+        if not validated_path.is_file():
             raise FileNotFoundError(f"File not found: {path}")
 
-        file.unlink()
+        validated_path.unlink()
 
         return f"Successfully deleted {path}"

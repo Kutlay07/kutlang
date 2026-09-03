@@ -1,9 +1,13 @@
-from pathlib import Path
+from harness.security.workspace_boundary import WorkspaceBoundary
 
 from ..base_tool import BaseTool
 
 
 class MoveFileTool(BaseTool):
+    
+    def __init__(self, workspace_boundary: WorkspaceBoundary):
+        self.workspace_boundary = workspace_boundary
+    
     @property
     def name(self) -> str:
         return "move_file"
@@ -31,11 +35,12 @@ class MoveFileTool(BaseTool):
         }
 
     def execute(self, source: str, destination: str) -> str:
-        file = Path(source)
+        validated_source = self.workspace_boundary.validate(source)
+        validated_destination = self.workspace_boundary.validate(destination)
 
-        if not file.is_file():
+        if not validated_source.is_file():
             raise FileNotFoundError(f"File not found: {source}")
 
-        file.rename(destination)
+        validated_source.rename(validated_destination)
 
         return f"Successfully moved {source} to {destination}"

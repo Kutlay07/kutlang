@@ -8,9 +8,12 @@ from harness.tools.filesystem.read_file import ReadFileTool
 from harness.tools.tool_registry import ToolRegistry
 from harness.tools.filesystem.write_file import WriteFileTool
 from harness.tools.filesystem.copy_file import CopyFileTool
+from harness.security.workspace_path_guard import WorkspacePathGuard
 
 
 def test_runtime_executes_real_read_file_tool(tmp_path):
+    workspace_boundary = WorkspacePathGuard(tmp_path)
+    
     file = tmp_path / "main.py"
     file.write_text("print('hello')", encoding="utf-8")
 
@@ -28,7 +31,7 @@ def test_runtime_executes_real_read_file_tool(tmp_path):
     ]
 
     tools = ToolRegistry([
-        ReadFileTool(),
+        ReadFileTool(workspace_boundary),
     ])
 
     runtime = AgentRuntime(llm, tools)
@@ -45,6 +48,8 @@ def test_runtime_executes_real_read_file_tool(tmp_path):
 
 
 def test_runtime_handles_real_read_file_error(tmp_path):
+    workspace_boundary = WorkspacePathGuard(tmp_path)
+    
     missing_file = tmp_path / "missing.py"
 
     llm = MagicMock(spec=BaseLLM)
@@ -61,7 +66,7 @@ def test_runtime_handles_real_read_file_error(tmp_path):
     ]
 
     tools = ToolRegistry([
-        ReadFileTool(),
+        ReadFileTool(workspace_boundary),
     ])
 
     runtime = AgentRuntime(llm, tools)
@@ -80,6 +85,8 @@ def test_runtime_handles_real_read_file_error(tmp_path):
 
 
 def test_runtime_executes_multiple_real_tools(tmp_path):
+    workspace_boundary = WorkspacePathGuard(tmp_path)
+    
     first_file = tmp_path / "first.py"
     second_file = tmp_path / "second.py"
 
@@ -108,7 +115,7 @@ def test_runtime_executes_multiple_real_tools(tmp_path):
     ]
 
     tools = ToolRegistry([
-        ReadFileTool(),
+        ReadFileTool(workspace_boundary),
     ])
 
     runtime = AgentRuntime(llm, tools)
@@ -129,6 +136,8 @@ def test_runtime_executes_multiple_real_tools(tmp_path):
 
 
 def test_runtime_executes_real_write_file_tool(tmp_path):
+    workspace_boundary = WorkspacePathGuard(tmp_path)
+    
     file = tmp_path / "created.py"
 
     llm = MagicMock(spec=BaseLLM)
@@ -148,7 +157,7 @@ def test_runtime_executes_real_write_file_tool(tmp_path):
     ]
 
     tools = ToolRegistry([
-        WriteFileTool(),
+        WriteFileTool(workspace_boundary),
     ])
 
     runtime = AgentRuntime(llm, tools)
@@ -168,6 +177,8 @@ def test_runtime_executes_real_write_file_tool(tmp_path):
 
 
 def test_runtime_handles_real_write_file_error(tmp_path):
+    workspace_boundary = WorkspacePathGuard(tmp_path)
+    
     directory = tmp_path / "directory"
     directory.mkdir()
 
@@ -188,7 +199,7 @@ def test_runtime_handles_real_write_file_error(tmp_path):
     ]
 
     tools = ToolRegistry([
-        WriteFileTool(),
+        WriteFileTool(workspace_boundary),
     ])
 
     runtime = AgentRuntime(llm, tools)
@@ -206,6 +217,8 @@ def test_runtime_handles_real_write_file_error(tmp_path):
 
 
 def test_runtime_executes_real_copy_file_tool(tmp_path):
+    workspace_boundary = WorkspacePathGuard(tmp_path)
+    
     source = tmp_path / "original.py"
     destination = tmp_path / "copy.py"
 
@@ -228,7 +241,7 @@ def test_runtime_executes_real_copy_file_tool(tmp_path):
     ]
 
     tools = ToolRegistry([
-        CopyFileTool(),
+        CopyFileTool(workspace_boundary),
     ])
 
     runtime = AgentRuntime(llm, tools)

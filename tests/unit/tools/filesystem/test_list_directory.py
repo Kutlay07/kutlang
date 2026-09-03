@@ -2,33 +2,33 @@ from harness.tools.base_tool import BaseTool
 from harness.tools.filesystem.list_directory import ListDirectoryTool
 
 
-def test_list_directory_tool_metadata():
-    tool = ListDirectoryTool()
+def test_list_directory_tool_metadata(workspace_boundary):
+    tool = ListDirectoryTool(workspace_boundary)
 
     assert tool.name == "list_directory"
     assert tool.description == "List the contents of a directory"
 
 
-def test_list_directory_tool_implements_base_tool():
-    tool = ListDirectoryTool()
+def test_list_directory_tool_implements_base_tool(workspace_boundary):
+    tool = ListDirectoryTool(workspace_boundary)
 
     assert isinstance(tool, BaseTool)
 
 
-def test_list_directory_tool_execute(tmp_path):
+def test_list_directory_tool_execute(tmp_path,workspace_boundary):
     (tmp_path / "b.py").write_text("", encoding="utf-8")
     (tmp_path / "a.py").write_text("", encoding="utf-8")
     (tmp_path / "src").mkdir()
 
-    tool = ListDirectoryTool()
+    tool = ListDirectoryTool(workspace_boundary)
 
     result = tool.execute(path=str(tmp_path))
 
     assert result == "a.py\nb.py\nsrc"
 
 
-def test_list_directory_tool_raises_for_missing_directory(tmp_path):
-    tool = ListDirectoryTool()
+def test_list_directory_tool_raises_for_missing_directory(tmp_path,workspace_boundary):
+    tool = ListDirectoryTool(workspace_boundary)
 
     missing = tmp_path / "missing"
 

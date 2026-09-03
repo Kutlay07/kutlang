@@ -1,9 +1,13 @@
-from pathlib import Path
+from harness.security.workspace_boundary import WorkspaceBoundary
 
 from ..base_tool import BaseTool
 
 
 class DeleteDirectoryTool(BaseTool):
+    
+    def __init__(self, workspace_boundary: WorkspaceBoundary):
+        self.workspace_boundary = workspace_boundary
+    
     @property
     def name(self) -> str:
         return "delete_directory"
@@ -27,13 +31,13 @@ class DeleteDirectoryTool(BaseTool):
         }
         
     def execute(self, path: str) -> str:
-        directory = Path(path)
+        validated_path = self.workspace_boundary.validate(path)
         
-        if not directory.is_dir():
+        if not validated_path.is_dir():
             raise FileNotFoundError(
                 f"Directory not found: {path}"
             )
             
-        directory.rmdir()
+        validated_path.rmdir()
         
         return f"Successfully deleted directory {path}"

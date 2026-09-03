@@ -6,6 +6,8 @@ from harness.llm.base_llm import BaseLLM
 from harness.llm.local import LocalLLM
 from harness.tools.entry_point_tool_discovery import EntryPointToolDiscovery
 from harness.tools.tool_registry import ToolRegistry
+from harness.security.workspace_path_guard import WorkspacePathGuard
+from harness.tools.filesystem.provider import FilesystemToolProvider
 
 
 def get_settings() -> Settings:
@@ -19,9 +21,21 @@ def get_llm(settings: Settings = Depends(get_settings)) -> BaseLLM:
     )
 
 
-def get_tool_registry() -> ToolRegistry:
+def get_tool_registry(
+    settings: Settings = Depends(get_settings),
+) -> ToolRegistry:
+    boundary = WorkspacePathGuard(settings.workspace_root)
+
     discovery = EntryPointToolDiscovery()
-    providers = discovery.discover()
+    provider_classes = discovery.discover()
+
+    providers = []
+    
+    for provider_class in provider_classes:
+        if provider_class is FilesystemToolProvider:
+            providers.append(provider_class(boundary))
+        else:
+            providers.append(provider_class())
 
     tools = [
         tool

@@ -1,9 +1,13 @@
-from pathlib import Path
+from harness.security.workspace_boundary import WorkspaceBoundary
 
 from ..base_tool import BaseTool
 
 
 class AppendFileTool(BaseTool):
+    
+    def __init__(self, workspace_boundary: WorkspaceBoundary):
+        self.workspace_boundary = workspace_boundary
+    
     @property
     def name(self) -> str:
         return "append_file"
@@ -31,7 +35,8 @@ class AppendFileTool(BaseTool):
         }
 
     def execute(self, path: str, content: str) -> str:
-        with Path(path).open("a", encoding="utf-8") as file:
+        validated_path = self.workspace_boundary.validate(path)
+        with validated_path.open("a", encoding="utf-8") as file:
             file.write(content)
 
         return f"Successfully appended content to {path}"

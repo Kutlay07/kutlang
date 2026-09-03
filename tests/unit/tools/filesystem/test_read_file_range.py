@@ -6,8 +6,8 @@ from harness.tools.filesystem.read_file_range import (
 )
 
 
-def test_read_file_range_tool_metadata():
-    tool = ReadFileRangeTool()
+def test_read_file_range_tool_metadata(workspace_boundary):
+    tool = ReadFileRangeTool(workspace_boundary)
 
     assert tool.name == "read_file_range"
     assert tool.description == (
@@ -15,13 +15,13 @@ def test_read_file_range_tool_metadata():
     )
 
 
-def test_read_file_range_tool_implements_base_tool():
-    tool = ReadFileRangeTool()
+def test_read_file_range_tool_implements_base_tool(workspace_boundary):
+    tool = ReadFileRangeTool(workspace_boundary)
 
     assert isinstance(tool, BaseTool)
 
 
-def test_read_file_range_tool_execute(tmp_path):
+def test_read_file_range_tool_execute(tmp_path,workspace_boundary):
     file = tmp_path / "test.py"
 
     file.write_text(
@@ -32,7 +32,7 @@ def test_read_file_range_tool_execute(tmp_path):
         encoding="utf-8",
     )
 
-    tool = ReadFileRangeTool()
+    tool = ReadFileRangeTool(workspace_boundary)
 
     result = tool.execute(
         path=str(file),
@@ -43,11 +43,11 @@ def test_read_file_range_tool_execute(tmp_path):
     assert result == "line 2\nline 3"
 
 
-def test_read_file_range_tool_raises_for_invalid_start_line(tmp_path):
+def test_read_file_range_tool_raises_for_invalid_start_line(tmp_path,workspace_boundary):
     file = tmp_path / "test.py"
     file.write_text("line 1", encoding="utf-8")
 
-    tool = ReadFileRangeTool()
+    tool = ReadFileRangeTool(workspace_boundary)
 
     with pytest.raises(ValueError):
         tool.execute(
@@ -57,11 +57,11 @@ def test_read_file_range_tool_raises_for_invalid_start_line(tmp_path):
         )
 
 
-def test_read_file_range_tool_raises_for_invalid_range(tmp_path):
+def test_read_file_range_tool_raises_for_invalid_range(tmp_path,workspace_boundary):
     file = tmp_path / "test.py"
     file.write_text("line 1", encoding="utf-8")
 
-    tool = ReadFileRangeTool()
+    tool = ReadFileRangeTool(workspace_boundary)
 
     with pytest.raises(ValueError):
         tool.execute(
