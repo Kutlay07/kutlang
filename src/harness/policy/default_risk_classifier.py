@@ -79,7 +79,10 @@ class DefaultRiskClassifier(RiskClassifier):
             return RiskLevel.HIGH
         
         if tool_name in COMMAND_EXECUTION_TOOLS:
-            command = request.arguments.arguments["command"]
+            command = request.arguments.arguments.get("command")
+            
+            if command is None:
+                return RiskLevel.HIGH
             
             if not isinstance(command, str):
                 return RiskLevel.HIGH
@@ -96,6 +99,8 @@ class DefaultRiskClassifier(RiskClassifier):
     ) -> RiskLevel | None:
         if request.arguments.arguments.get("path") is not None:
             path = request.arguments.arguments["path"]
+            if not isinstance(path, str):
+                return RiskLevel.HIGH
             normalized = path.replace("\\", "/")
             basename = normalized.rsplit("/", 1)[-1]
             
@@ -113,12 +118,14 @@ class DefaultRiskClassifier(RiskClassifier):
             parts = shlex.split(command)
             if not parts:
                 return RiskLevel.HIGH
-            command_name = parts[0]
+            normalized_parts = [part.lower() for part in parts]
+            
+            command_name = parts[0].lower()
             if command_name in PROCESS_COMMANDS:
-                if "-Verb" in parts:
-                    index = parts.index("-Verb")
+                if "-verb" in normalized_parts:
+                    index = normalized_parts.index("-verb")
                     if index + 1 < len(parts):
-                        if parts[index + 1] == "RunAs":
+                        if normalized_parts[index + 1] == "runas":
                             return RiskLevel.CRITICAL
                     return RiskLevel.HIGH
             
@@ -128,16 +135,15 @@ class DefaultRiskClassifier(RiskClassifier):
             if command_name in SYSTEM_DESTRUCTIVE:
                 return RiskLevel.CRITICAL
             
-            program = parts[0]
             if len(parts) > 1:
-                action = parts[1]
-                if program + " " + action in DEPENDENCY_MUTATION:
+                action = parts[1].lower()
+                if command_name + " " + action in DEPENDENCY_MUTATION:
                     return RiskLevel.MEDIUM
-                if program + " " + action in READ_ONLY_GIT_COMMANDS:
+                if command_name + " " + action in READ_ONLY_GIT_COMMANDS:
                     return RiskLevel.LOW
-                if program + " " + action in MEDIUM_GIT_COMMANDS:
+                if command_name + " " + action in MEDIUM_GIT_COMMANDS:
                     return RiskLevel.MEDIUM
-                if program + " " + action in HIGH_GIT_COMMANDS:
+                if command_name + " " + action in HIGH_GIT_COMMANDS:
                     return RiskLevel.HIGH
             
             return RiskLevel.HIGH

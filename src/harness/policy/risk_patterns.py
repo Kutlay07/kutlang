@@ -68,7 +68,7 @@ PRIVILEGE_ESCALATION = frozenset({
 })
 
 PROCESS_COMMANDS = frozenset({
-    "Start-Process",
+    "start-process",
 })
 
 

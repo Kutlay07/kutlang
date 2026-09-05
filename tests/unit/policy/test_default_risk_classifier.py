@@ -441,3 +441,33 @@ def test_uv_mediums():
     assert request2_risk == RiskLevel.MEDIUM
     assert request3_risk == RiskLevel.MEDIUM
     assert request4_risk == RiskLevel.MEDIUM
+
+
+def test_process_commands_are_not_case_sensitive():
+    classifier = DefaultRiskClassifier()
+    
+    request1 = ToolExecutionRequest(
+        tool_name="run_command",
+        arguments=ToolArguments({
+            "command": "start-process -verb runas"}),
+    )
+    
+    request2 = ToolExecutionRequest(
+        tool_name="run_command",
+        arguments=ToolArguments({
+            "command": "Start-Process -verb runas"}),
+    )
+    
+    request3 = ToolExecutionRequest(
+        tool_name="run_command",
+        arguments=ToolArguments({
+            "command": "START-PROCESS -VERB RUNAS"}),
+    )
+    
+    request1_risk = classifier.classify(request1)
+    request2_risk = classifier.classify(request2)
+    request3_risk = classifier.classify(request3)
+    
+    assert request1_risk == RiskLevel.CRITICAL
+    assert request2_risk == RiskLevel.CRITICAL
+    assert request3_risk == RiskLevel.CRITICAL
