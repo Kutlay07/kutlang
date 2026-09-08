@@ -1,17 +1,42 @@
+import pytest
 from unittest.mock import MagicMock
 
 from harness.agent.agent_response import AgentResponse
 from harness.agent.agent_runtime import AgentRuntime
 from harness.agent.tool_call import ToolCall
 from harness.llm.base_llm import BaseLLM
+from harness.policy.approval_broker import ApprovalBroker
+from harness.policy.policy_decision import PolicyDecision
+from harness.policy.policy_engine import PolicyEngine
+from harness.policy.policy_evaluation import PolicyEvaluation
+from harness.policy.risk_level import RiskLevel
 from harness.tools.filesystem.read_file import ReadFileTool
 from harness.tools.tool_registry import ToolRegistry
 from harness.tools.filesystem.write_file import WriteFileTool
 from harness.tools.filesystem.copy_file import CopyFileTool
 from harness.security.workspace_path_guard import WorkspacePathGuard
 
+@pytest.fixture
+def policy_engine():
+    return MagicMock(spec=PolicyEngine)
 
-def test_runtime_executes_real_read_file_tool(tmp_path):
+@pytest.fixture
+def approval_broker():
+    return MagicMock(spec=ApprovalBroker)
+
+
+@pytest.mark.asyncio
+async def test_runtime_executes_real_read_file_tool(
+    tmp_path,
+    policy_engine,
+    approval_broker,
+    ):
+    
+    policy_engine.evaluate.return_value = PolicyEvaluation(
+    decision=PolicyDecision.ALLOW,
+    risk_level=RiskLevel.LOW,
+    )
+    
     workspace_boundary = WorkspacePathGuard(tmp_path)
     
     file = tmp_path / "main.py"
@@ -34,9 +59,14 @@ def test_runtime_executes_real_read_file_tool(tmp_path):
         ReadFileTool(workspace_boundary),
     ])
 
-    runtime = AgentRuntime(llm, tools)
+    runtime = AgentRuntime(
+        llm,
+        tools,
+        policy_engine,
+        approval_broker,
+        )
 
-    result = runtime.run("Read main.py")
+    result = await runtime.run("Read main.py")
 
     assert result.text == "The file contains print('hello')."
 
@@ -47,7 +77,18 @@ def test_runtime_executes_real_read_file_tool(tmp_path):
     assert second_conversation[-1].result == "print('hello')"
 
 
-def test_runtime_handles_real_read_file_error(tmp_path):
+@pytest.mark.asyncio
+async def test_runtime_handles_real_read_file_error(
+    tmp_path,
+    policy_engine,
+    approval_broker,
+    ):
+    
+    policy_engine.evaluate.return_value = PolicyEvaluation(
+    decision=PolicyDecision.ALLOW,
+    risk_level=RiskLevel.LOW,
+    )
+    
     workspace_boundary = WorkspacePathGuard(tmp_path)
     
     missing_file = tmp_path / "missing.py"
@@ -69,9 +110,14 @@ def test_runtime_handles_real_read_file_error(tmp_path):
         ReadFileTool(workspace_boundary),
     ])
 
-    runtime = AgentRuntime(llm, tools)
+    runtime = AgentRuntime(
+        llm,
+        tools,
+        policy_engine,
+        approval_broker,
+        )
 
-    result = runtime.run("Read missing.py")
+    result = await runtime.run("Read missing.py")
 
     assert result.text == "I couldn't read the file."
 
@@ -84,7 +130,18 @@ def test_runtime_handles_real_read_file_error(tmp_path):
     assert "No such file" in tool_result.result or "does not exist" in tool_result.result
 
 
-def test_runtime_executes_multiple_real_tools(tmp_path):
+@pytest.mark.asyncio
+async def test_runtime_executes_multiple_real_tools(
+    tmp_path,
+    policy_engine,
+    approval_broker,
+    ):
+    
+    policy_engine.evaluate.return_value = PolicyEvaluation(
+    decision=PolicyDecision.ALLOW,
+    risk_level=RiskLevel.LOW,
+    )
+    
     workspace_boundary = WorkspacePathGuard(tmp_path)
     
     first_file = tmp_path / "first.py"
@@ -118,9 +175,14 @@ def test_runtime_executes_multiple_real_tools(tmp_path):
         ReadFileTool(workspace_boundary),
     ])
 
-    runtime = AgentRuntime(llm, tools)
+    runtime = AgentRuntime(
+        llm,
+        tools,
+        policy_engine,
+        approval_broker,
+        )
 
-    result = runtime.run("Read both files")
+    result = await runtime.run("Read both files")
 
     assert result.text == "Both files read."
 
@@ -135,7 +197,17 @@ def test_runtime_executes_multiple_real_tools(tmp_path):
     assert results[1].result == "second"
 
 
-def test_runtime_executes_real_write_file_tool(tmp_path):
+@pytest.mark.asyncio
+async def test_runtime_executes_real_write_file_tool(
+    tmp_path,
+    policy_engine,
+    approval_broker,
+    ):
+    policy_engine.evaluate.return_value = PolicyEvaluation(
+    decision=PolicyDecision.ALLOW,
+    risk_level=RiskLevel.LOW,
+    )
+    
     workspace_boundary = WorkspacePathGuard(tmp_path)
     
     file = tmp_path / "created.py"
@@ -160,9 +232,14 @@ def test_runtime_executes_real_write_file_tool(tmp_path):
         WriteFileTool(workspace_boundary),
     ])
 
-    runtime = AgentRuntime(llm, tools)
+    runtime = AgentRuntime(
+        llm,
+        tools,
+        policy_engine,
+        approval_broker,
+        )
 
-    result = runtime.run("Create the file")
+    result = await runtime.run("Create the file")
 
     assert result.text == "File created."
     assert file.read_text(encoding="utf-8") == "print('hello')"
@@ -176,7 +253,17 @@ def test_runtime_executes_real_write_file_tool(tmp_path):
     assert tool_result.is_error is False
 
 
-def test_runtime_handles_real_write_file_error(tmp_path):
+@pytest.mark.asyncio
+async def test_runtime_handles_real_write_file_error(
+    tmp_path,
+    policy_engine,
+    approval_broker,
+    ):
+    policy_engine.evaluate.return_value = PolicyEvaluation(
+    decision=PolicyDecision.ALLOW,
+    risk_level=RiskLevel.LOW,
+    )
+    
     workspace_boundary = WorkspacePathGuard(tmp_path)
     
     directory = tmp_path / "directory"
@@ -202,9 +289,14 @@ def test_runtime_handles_real_write_file_error(tmp_path):
         WriteFileTool(workspace_boundary),
     ])
 
-    runtime = AgentRuntime(llm, tools)
+    runtime = AgentRuntime(
+        llm,
+        tools,
+        policy_engine,
+        approval_broker,
+        )
 
-    result = runtime.run("Write the file")
+    result = await runtime.run("Write the file")
 
     assert result.text == "I couldn't write the file."
 
@@ -216,7 +308,17 @@ def test_runtime_handles_real_write_file_error(tmp_path):
     assert tool_result.is_error is True
 
 
-def test_runtime_executes_real_copy_file_tool(tmp_path):
+@pytest.mark.asyncio
+async def test_runtime_executes_real_copy_file_tool(
+    tmp_path,
+    policy_engine,
+    approval_broker,
+    ):
+    policy_engine.evaluate.return_value = PolicyEvaluation(
+    decision=PolicyDecision.ALLOW,
+    risk_level=RiskLevel.LOW,
+    )
+    
     workspace_boundary = WorkspacePathGuard(tmp_path)
     
     source = tmp_path / "original.py"
@@ -244,9 +346,14 @@ def test_runtime_executes_real_copy_file_tool(tmp_path):
         CopyFileTool(workspace_boundary),
     ])
 
-    runtime = AgentRuntime(llm, tools)
+    runtime = AgentRuntime(
+        llm,
+        tools,
+        policy_engine,
+        approval_broker,
+        )
 
-    result = runtime.run("Copy original.py to copy.py")
+    result = await runtime.run("Copy original.py to copy.py")
 
     assert result.text == "File copied."
 
