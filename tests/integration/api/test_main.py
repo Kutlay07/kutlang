@@ -7,7 +7,7 @@ from harness.main import app
 
 def test_chat_endpoint():
     class FakeRuntime:
-        def run(self, prompt):
+        async def run(self, prompt):
             assert prompt == "Hello"
             return AgentResponse(text="Hello back")
 
@@ -32,7 +32,7 @@ def test_chat_endpoint():
 
 def test_chat_request_validation():
     class FakeRuntime:
-        def run(self, prompt):
+        async def run(self, prompt):
             return AgentResponse(text="unused")
 
     app.dependency_overrides[get_agent_runtime] = lambda: FakeRuntime()

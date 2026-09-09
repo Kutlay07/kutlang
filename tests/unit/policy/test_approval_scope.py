@@ -1,15 +1,8 @@
-import pytest
-
 from harness.policy.approval_scope import ApprovalScope
 
 
-def test_approval_scope_requires_tool_name():
-    scope = ApprovalScope(tool_name="read")
-    
-    assert scope.tool_name == "read"
-
-
-@pytest.mark.parametrize("tool_name", ["", "  ", None, 123])
-def test_approval_scope_rejects_invalid_tool_name(tool_name):
-    with pytest.raises(ValueError):
-        ApprovalScope(tool_name=tool_name)
+def test_approval_scope_has_expected_values():
+    assert ApprovalScope.SINGLE_CALL == "single call"
+    assert ApprovalScope.SESSION == "session"
+    assert ApprovalScope.COMMAND_PATTERN == "command pattern"
+    assert ApprovalScope.WORKSPACE == "workspace"

@@ -1,10 +1,8 @@
-from dataclasses import dataclass
+from enum import Enum
 
 
-@dataclass(frozen=True)
-class ApprovalScope:
-    tool_name: str
-    
-    def __post_init__(self) -> None:
-        if not isinstance(self.tool_name, str) or not self.tool_name.strip():
-            raise ValueError("tool_name must not be empty")
+class ApprovalScope(str, Enum):
+    SINGLE_CALL = "single call"
+    SESSION = "session"
+    COMMAND_PATTERN = "command pattern"
+    WORKSPACE = "workspace"

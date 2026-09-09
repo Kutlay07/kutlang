@@ -8,6 +8,6 @@ from harness.policy.tool_execution_request import ToolExecutionRequest
 def test_tool_execution_request_rejects_invalid_tool_name(tool_name):
     with pytest.raises(ValueError):
         ToolExecutionRequest(
-            arguments=ToolArguments(arguments={}), 
+            arguments=ToolArguments(arguments={}),
             tool_name=tool_name
             )
