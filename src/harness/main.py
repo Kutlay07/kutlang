@@ -18,8 +18,8 @@ app = FastAPI(
 
 
 @app.post("/chat")
-def chat(
+async def chat(
     request: ChatRequest,
     runtime: AgentRuntime = Depends(get_agent_runtime),
 ):
-    return runtime.run(request.prompt)
+    return await runtime.run(request.prompt)

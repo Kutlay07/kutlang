@@ -121,7 +121,7 @@ async def test_runtime_executes_tool_calls(
 
 
 @pytest.mark.asyncio
-async def test_runtime_sends_too_result_back_to_llm(
+async def test_runtime_sends_tool_result_back_to_llm(
     runtime, 
     llm, 
     tools, 

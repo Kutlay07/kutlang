@@ -8,6 +8,7 @@ from harness.policy.policy_context import PolicyContext
 from harness.policy.policy_decision import PolicyDecision
 from harness.policy.approval_request import ApprovalRequest
 from harness.policy.policy_engine import PolicyEngine
+from harness.policy.tool_arguments import ToolArguments
 from harness.policy.tool_execution_request import ToolExecutionRequest
 from harness.tools.tool_registry import ToolRegistry
 
@@ -70,14 +71,23 @@ class AgentRuntime:
         for tool_call in response.tool_calls or []:
             tool_execution_request = ToolExecutionRequest(
                 tool_name=tool_call.name,
-                arguments=tool_call.arguments,
+                arguments=ToolArguments(tool_call.arguments),
             )
             
             policy_context = PolicyContext(
                 request=tool_execution_request
             )
             
-            evaluation = self.policy_engine.evaluate(policy_context)
+            try:
+                evaluation = self.policy_engine.evaluate(policy_context)
+                
+            except Exception as exc:
+                result = self._create_tool_failure_result(
+                    tool_call,
+                    reason=f"Policy evaluation failed: {exc}",
+                )
+                results.append(result)
+                continue
             
             if evaluation.decision == PolicyDecision.ALLOW:
                 result = self._execute_tool_call(tool_call)
