@@ -6,7 +6,9 @@ from harness.agent.tool_result import ToolResult
 from harness.llm.base_llm import BaseLLM
 from harness.llm.message import Message
 from harness.observability.approval_audit_data import ApprovalAuditData
-from harness.observability.approval_requested_audit_data import ApprovalRequestedAuditData
+from harness.observability.approval_requested_audit_data import (
+    ApprovalRequestedAuditData,
+)
 from harness.observability.audit_approval_result import AuditApprovalResult
 from harness.observability.audit_approval_scope import AuditApprovalScope
 from harness.observability.audit_emitter import AuditEmitter
@@ -15,14 +17,18 @@ from harness.observability.audit_event_type import AuditEventType
 from harness.observability.audit_outcome import AuditOutcome
 from harness.observability.audit_policy_risk_level import AuditPolicyRiskLevel
 from harness.observability.policy_audit_data import PolicyAuditData
-from harness.observability.tool_completion_audit_data import ToolCompletionAuditData
+from harness.observability.tool_completion_audit_data import (
+    ToolCompletionAuditData,
+)
 from harness.observability.tool_failure_audit_data import ToolFailureAuditData
-from harness.observability.tool_invocation_audit_data import ToolInvocationAuditData
+from harness.observability.tool_invocation_audit_data import (
+    ToolInvocationAuditData,
+)
 from harness.policy.approval_broker import ApprovalBroker
+from harness.policy.approval_request import ApprovalRequest
 from harness.policy.approval_result import ApprovalResult
 from harness.policy.policy_context import PolicyContext
 from harness.policy.policy_decision import PolicyDecision
-from harness.policy.approval_request import ApprovalRequest
 from harness.policy.policy_engine import PolicyEngine
 from harness.policy.tool_arguments import ToolArguments
 from harness.policy.tool_execution_request import ToolExecutionRequest
@@ -30,6 +36,7 @@ from harness.tools.tool_registry import ToolRegistry
 
 
 logger = logging.getLogger(__name__)
+
 
 class AgentRuntime:
     def __init__(
@@ -94,7 +101,15 @@ class AgentRuntime:
                 arguments=ToolArguments(tool_call.arguments),
             )
             
-            registration = self.tools.get_registration(tool_call.name)
+            try:
+                registration = self.tools.get_registration(tool_call.name)
+            except KeyError:
+                result = self._create_tool_failure_result(
+                    tool_call,
+                    reason=f"Unknown tool: {tool_call.name}",
+                )
+                results.append(result)
+                continue
             
             policy_context = PolicyContext(
                 request=tool_execution_request,
@@ -103,7 +118,6 @@ class AgentRuntime:
             
             try:
                 evaluation = self.policy_engine.evaluate(policy_context)
-                
             except Exception as exc:
                 result = self._create_tool_failure_result(
                     tool_call,
@@ -111,8 +125,12 @@ class AgentRuntime:
                 )
                 results.append(result)
                 continue
+            
             try:
-                self._emit_policy_evaluation_audit(tool_call, evaluation)
+                self._emit_policy_evaluation_audit(
+                    tool_call,
+                    evaluation,
+                )
             except Exception:
                 logger.exception("Failed to emit audit event")
                 
@@ -131,13 +149,16 @@ class AgentRuntime:
                     self._emit_approval_requested_audit(
                         tool_call,
                         approval_request,
-                        )
+                    )
                 except Exception:
                     logger.exception("Failed to emit audit event")
                     
-                approval_result = await self.approval_broker.request_approval(
-                    approval_request
+                approval_result = (
+                    await self.approval_broker.request_approval(
+                        approval_request
+                    )
                 )
+                
                 try:
                     self._emit_approval_completed_audit(
                         tool_call,
@@ -146,18 +167,18 @@ class AgentRuntime:
                     )
                 except Exception:
                     logger.exception("Failed to emit audit event")
-                
+                    
                 if approval_result == ApprovalResult.GRANTED:
                     result = self._execute_tool_call(tool_call)
                     results.append(result)
-                
+                    
                 elif approval_result == ApprovalResult.REJECTED:
                     result = self._create_tool_failure_result(
                         tool_call,
                         reason="Tool execution rejected by user.",
                     )
                     results.append(result)
-                
+                    
                 elif approval_result == ApprovalResult.EXPIRED:
                     result = self._create_tool_failure_result(
                         tool_call,
@@ -178,7 +199,7 @@ class AgentRuntime:
                     reason="Tool execution denied by policy.",
                 )
                 results.append(result)
-            
+                
         return results
 
 
@@ -186,7 +207,6 @@ class AgentRuntime:
         self,
         tool_call,
     ) -> ToolResult:
-        
         try:
             audit_event = AuditEvent(
                 event_type=AuditEventType.TOOL_INVOKED,
@@ -200,12 +220,15 @@ class AgentRuntime:
             )
             
             self.audit_emitter.emit(audit_event)
-        except  Exception:
+            
+        except Exception:
             logger.exception("Failed to emit audit event")
+            
         try:
             tool = self.tools.get(tool_call.name)
             result = tool.execute(**tool_call.arguments)
             is_error = False
+            
             try:
                 audit_event = AuditEvent(
                     event_type=AuditEventType.TOOL_COMPLETED,
@@ -217,12 +240,16 @@ class AgentRuntime:
                         result=result,
                     ),
                 )
+                
                 self.audit_emitter.emit(audit_event)
+                
             except Exception:
                 logger.exception("Failed to emit audit event")
+                
         except Exception as exc:
             result = str(exc)
             is_error = True
+            
             try:
                 audit_event = AuditEvent(
                     event_type=AuditEventType.TOOL_FAILED,
@@ -235,16 +262,18 @@ class AgentRuntime:
                         error=str(exc),
                     ),
                 )
+                
                 self.audit_emitter.emit(audit_event)
+                
             except Exception:
                 logger.exception("Failed to emit audit event")
-            
+                
         return ToolResult(
-                call_id=tool_call.call_id,
-                tool_name=tool_call.name,
-                result=result,
-                is_error=is_error,
-            )
+            call_id=tool_call.call_id,
+            tool_name=tool_call.name,
+            result=result,
+            is_error=is_error,
+        )
 
 
     def _create_tool_failure_result(
@@ -261,25 +290,25 @@ class AgentRuntime:
 
 
     def _emit_policy_evaluation_audit(
-        self, 
+        self,
         tool_call,
-        evaluation
-        ):
-            policy_audit_data = PolicyAuditData(
-                decision=evaluation.decision,
-                risk_level=evaluation.risk_level,
-                )
-                
-            audit_event = AuditEvent(
-                event_type=AuditEventType.POLICY_EVALUATED,
-                timestamp=datetime.now(timezone.utc),
-                tool_call_id=tool_call.call_id,
-                tool_name=tool_call.name,
-                outcome=AuditOutcome.SUCCESS,
-                payload=policy_audit_data,
-                )
-                
-            self.audit_emitter.emit(audit_event)
+        evaluation,
+    ):
+        policy_audit_data = PolicyAuditData(
+            decision=evaluation.decision,
+            risk_level=evaluation.risk_level,
+        )
+        
+        audit_event = AuditEvent(
+            event_type=AuditEventType.POLICY_EVALUATED,
+            timestamp=datetime.now(timezone.utc),
+            tool_call_id=tool_call.call_id,
+            tool_name=tool_call.name,
+            outcome=AuditOutcome.SUCCESS,
+            payload=policy_audit_data,
+        )
+        
+        self.audit_emitter.emit(audit_event)
 
 
     def _emit_approval_requested_audit(
@@ -288,8 +317,12 @@ class AgentRuntime:
         approval_request,
     ):
         approval_audit_data = ApprovalRequestedAuditData(
-            risk_level=AuditPolicyRiskLevel(approval_request.risk_level.value),
-            scope=AuditApprovalScope(approval_request.scope.value)
+            risk_level=AuditPolicyRiskLevel(
+                approval_request.risk_level.value
+            ),
+            scope=AuditApprovalScope(
+                approval_request.scope.value
+            ),
         )
         
         audit_event = AuditEvent(
@@ -308,23 +341,30 @@ class AgentRuntime:
         self,
         tool_call,
         approval_result,
-        approval_request
+        approval_request,
     ):
-        audit_approval_result = AuditApprovalResult(approval_result.value)
+        audit_approval_result = AuditApprovalResult(
+            approval_result.value
+        )
         
         if audit_approval_result == AuditApprovalResult.GRANTED:
             audit_outcome = AuditOutcome.APPROVED
         elif audit_approval_result == AuditApprovalResult.REJECTED:
             audit_outcome = AuditOutcome.DENIED
-        elif audit_approval_result == AuditApprovalResult.EXPIRED:
+        elif audit_approval_result in (
+            AuditApprovalResult.EXPIRED,
+            AuditApprovalResult.CANCELED,
+        ):
             audit_outcome = AuditOutcome.FAILURE
-        elif audit_approval_result == AuditApprovalResult.CANCELED:
-            audit_outcome = AuditOutcome.FAILURE
-        
+            
         approval_audit_data = ApprovalAuditData(
-            risk_level=AuditPolicyRiskLevel(approval_request.risk_level.value),
-            scope=AuditApprovalScope(approval_request.scope.value),
-            result=audit_approval_result
+            risk_level=AuditPolicyRiskLevel(
+                approval_request.risk_level.value
+            ),
+            scope=AuditApprovalScope(
+                approval_request.scope.value
+            ),
+            result=audit_approval_result,
         )
         
         audit_event = AuditEvent(
