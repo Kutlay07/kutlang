@@ -8,7 +8,7 @@ from harness.policy.risk_level import RiskLevel
 @dataclass(frozen=True)
 class PolicyEvaluation:
     decision: PolicyDecision
-    risk_level: RiskLevel
+    risk_level: RiskLevel | None = None
     approval_scope: ApprovalScope | None = None
     
     def __post_init__(self):

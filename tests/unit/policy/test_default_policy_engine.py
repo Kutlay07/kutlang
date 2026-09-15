@@ -7,6 +7,7 @@ from harness.policy.policy_decision import PolicyDecision
 from harness.policy.risk_level import RiskLevel
 from harness.policy.tool_arguments import ToolArguments
 from harness.policy.tool_execution_request import ToolExecutionRequest
+from harness.policy.trust_level import TrustLevel
 
 
 class DummyRiskClassifier:
@@ -33,7 +34,8 @@ def test_default_policy_engine_all_situations(risk_level, decision, approval_sco
     )
     
     policy_context = PolicyContext(
-        tool_execution_request
+        tool_execution_request,
+        trust_level=TrustLevel.TRUSTED,
     )
     
     classifier = DummyRiskClassifier(risk_level)

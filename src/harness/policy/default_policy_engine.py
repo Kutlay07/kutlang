@@ -5,6 +5,7 @@ from harness.policy.policy_engine import PolicyEngine
 from harness.policy.policy_evaluation import PolicyEvaluation
 from harness.policy.risk_classifier import RiskClassifier
 from harness.policy.risk_level import RiskLevel
+from harness.policy.trust_level import TrustLevel
 
 
 class DefaultPolicyEngine(PolicyEngine):
@@ -14,6 +15,15 @@ class DefaultPolicyEngine(PolicyEngine):
 
 
     def evaluate(self, policy_context: PolicyContext) -> PolicyEvaluation:
+        if policy_context.trust_level in (
+            TrustLevel.UNKNOWN, 
+            TrustLevel.UNTRUSTED):
+            return PolicyEvaluation(
+                decision=PolicyDecision.DENY,
+                risk_level=None,
+                approval_scope=None,
+            )
+            
         risk_level = self.risk_classifier.classify(
             policy_context.request
         )
