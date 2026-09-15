@@ -1,13 +1,21 @@
+from pathlib import Path
 from fastapi.testclient import TestClient
 
 from harness.agent.agent_response import AgentResponse
 from harness.agent.tool_call import ToolCall
 from harness.agent.tool_result import ToolResult
-from harness.application.dependencies import get_llm
 from harness.llm.base_llm import BaseLLM
 from harness.main import app
+from harness.application.dependencies import get_llm, get_settings
+from harness.config.settings import Settings
 
 
+settings = Settings(
+    local_llm_base_url="http://fake",
+    local_llm_model="fake",
+    max_iterations=10,
+    workspace_root=Path("."),
+)
 class FakeLLM(BaseLLM):
     def __init__(self):
         self.tool_result = None
@@ -44,7 +52,9 @@ class FakeLLM(BaseLLM):
 
 def test_chat_completes_end_to_end():
     fake_llm = FakeLLM()
+
     app.dependency_overrides[get_llm] = lambda: fake_llm
+    app.dependency_overrides[get_settings] = lambda: settings
 
     try:
         client = TestClient(app)
