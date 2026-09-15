@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 
-from harness.policy.tool_execution_request import ToolExecutionRequest
 from harness.policy.trust_level import TrustLevel
+from harness.tools.base_tool import BaseTool
 
 
 @dataclass(frozen=True)
-class PolicyContext:
-    request: ToolExecutionRequest
+class ToolRegistration:
+    tool: BaseTool
     trust_level: TrustLevel = TrustLevel.UNKNOWN

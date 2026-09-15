@@ -5,6 +5,7 @@ from harness.agent.agent_response import AgentResponse
 from harness.agent.agent_runtime import AgentRuntime
 from harness.agent.tool_call import ToolCall
 from harness.llm.base_llm import BaseLLM
+from harness.observability.audit_emitter import AuditEmitter
 from harness.policy.approval_broker import ApprovalBroker
 from harness.policy.policy_decision import PolicyDecision
 from harness.policy.policy_engine import PolicyEngine
@@ -15,6 +16,8 @@ from harness.tools.tool_registry import ToolRegistry
 from harness.tools.filesystem.write_file import WriteFileTool
 from harness.tools.filesystem.copy_file import CopyFileTool
 from harness.security.workspace_path_guard import WorkspacePathGuard
+from harness.policy.trust_level import TrustLevel
+from harness.tools.tool_registration import ToolRegistration
 
 @pytest.fixture
 def policy_engine():
@@ -24,12 +27,17 @@ def policy_engine():
 def approval_broker():
     return MagicMock(spec=ApprovalBroker)
 
+@pytest.fixture
+def audit_emitter():
+    return MagicMock(spec=AuditEmitter)
+
 
 @pytest.mark.asyncio
 async def test_runtime_executes_real_read_file_tool(
     tmp_path,
     policy_engine,
     approval_broker,
+    audit_emitter,
     ):
     
     policy_engine.evaluate.return_value = PolicyEvaluation(
@@ -56,7 +64,10 @@ async def test_runtime_executes_real_read_file_tool(
     ]
 
     tools = ToolRegistry([
-        ReadFileTool(workspace_boundary),
+        ToolRegistration(
+            tool=ReadFileTool(workspace_boundary),
+            trust_level=TrustLevel.TRUSTED,
+        ),
     ])
 
     runtime = AgentRuntime(
@@ -64,6 +75,7 @@ async def test_runtime_executes_real_read_file_tool(
         tools,
         policy_engine,
         approval_broker,
+        audit_emitter,
         )
 
     result = await runtime.run("Read main.py")
@@ -82,6 +94,7 @@ async def test_runtime_handles_real_read_file_error(
     tmp_path,
     policy_engine,
     approval_broker,
+    audit_emitter,
     ):
     
     policy_engine.evaluate.return_value = PolicyEvaluation(
@@ -107,7 +120,10 @@ async def test_runtime_handles_real_read_file_error(
     ]
 
     tools = ToolRegistry([
-        ReadFileTool(workspace_boundary),
+        ToolRegistration(
+            tool=ReadFileTool(workspace_boundary),
+            trust_level=TrustLevel.TRUSTED,
+        ),
     ])
 
     runtime = AgentRuntime(
@@ -115,6 +131,7 @@ async def test_runtime_handles_real_read_file_error(
         tools,
         policy_engine,
         approval_broker,
+        audit_emitter,
         )
 
     result = await runtime.run("Read missing.py")
@@ -135,6 +152,7 @@ async def test_runtime_executes_multiple_real_tools(
     tmp_path,
     policy_engine,
     approval_broker,
+    audit_emitter,
     ):
     
     policy_engine.evaluate.return_value = PolicyEvaluation(
@@ -172,7 +190,10 @@ async def test_runtime_executes_multiple_real_tools(
     ]
 
     tools = ToolRegistry([
-        ReadFileTool(workspace_boundary),
+        ToolRegistration(
+            tool=ReadFileTool(workspace_boundary),
+            trust_level=TrustLevel.TRUSTED,
+        ),
     ])
 
     runtime = AgentRuntime(
@@ -180,6 +201,7 @@ async def test_runtime_executes_multiple_real_tools(
         tools,
         policy_engine,
         approval_broker,
+        audit_emitter,
         )
 
     result = await runtime.run("Read both files")
@@ -202,6 +224,7 @@ async def test_runtime_executes_real_write_file_tool(
     tmp_path,
     policy_engine,
     approval_broker,
+    audit_emitter,
     ):
     policy_engine.evaluate.return_value = PolicyEvaluation(
     decision=PolicyDecision.ALLOW,
@@ -229,7 +252,10 @@ async def test_runtime_executes_real_write_file_tool(
     ]
 
     tools = ToolRegistry([
-        WriteFileTool(workspace_boundary),
+        ToolRegistration(
+            tool=WriteFileTool(workspace_boundary),
+            trust_level=TrustLevel.TRUSTED,
+        ),
     ])
 
     runtime = AgentRuntime(
@@ -237,6 +263,7 @@ async def test_runtime_executes_real_write_file_tool(
         tools,
         policy_engine,
         approval_broker,
+        audit_emitter,
         )
 
     result = await runtime.run("Create the file")
@@ -258,6 +285,7 @@ async def test_runtime_handles_real_write_file_error(
     tmp_path,
     policy_engine,
     approval_broker,
+    audit_emitter,
     ):
     policy_engine.evaluate.return_value = PolicyEvaluation(
     decision=PolicyDecision.ALLOW,
@@ -286,7 +314,10 @@ async def test_runtime_handles_real_write_file_error(
     ]
 
     tools = ToolRegistry([
-        WriteFileTool(workspace_boundary),
+        ToolRegistration(
+            tool=WriteFileTool(workspace_boundary),
+            trust_level=TrustLevel.TRUSTED,
+        ),
     ])
 
     runtime = AgentRuntime(
@@ -294,6 +325,7 @@ async def test_runtime_handles_real_write_file_error(
         tools,
         policy_engine,
         approval_broker,
+        audit_emitter,
         )
 
     result = await runtime.run("Write the file")
@@ -313,6 +345,7 @@ async def test_runtime_executes_real_copy_file_tool(
     tmp_path,
     policy_engine,
     approval_broker,
+    audit_emitter,
     ):
     policy_engine.evaluate.return_value = PolicyEvaluation(
     decision=PolicyDecision.ALLOW,
@@ -343,7 +376,10 @@ async def test_runtime_executes_real_copy_file_tool(
     ]
 
     tools = ToolRegistry([
-        CopyFileTool(workspace_boundary),
+        ToolRegistration(
+            tool=CopyFileTool(workspace_boundary),
+            trust_level=TrustLevel.TRUSTED,
+        ),
     ])
 
     runtime = AgentRuntime(
@@ -351,6 +387,7 @@ async def test_runtime_executes_real_copy_file_tool(
         tools,
         policy_engine,
         approval_broker,
+        audit_emitter,
         )
 
     result = await runtime.run("Copy original.py to copy.py")

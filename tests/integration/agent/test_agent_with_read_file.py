@@ -5,12 +5,15 @@ from harness.agent.agent_response import AgentResponse
 from harness.agent.agent_runtime import AgentRuntime
 from harness.agent.tool_call import ToolCall
 from harness.llm.base_llm import BaseLLM
+from harness.observability.audit_emitter import AuditEmitter
 from harness.policy.approval_broker import ApprovalBroker
 from harness.policy.policy_decision import PolicyDecision
 from harness.policy.policy_engine import PolicyEngine
 from harness.policy.policy_evaluation import PolicyEvaluation
 from harness.policy.risk_level import RiskLevel
+from harness.policy.trust_level import TrustLevel
 from harness.tools.filesystem.read_file import ReadFileTool
+from harness.tools.tool_registration import ToolRegistration
 from harness.tools.tool_registry import ToolRegistry
 from harness.security.workspace_path_guard import WorkspacePathGuard
 
@@ -25,6 +28,10 @@ def policy_engine():
 def approval_broker():
     return MagicMock(spec=ApprovalBroker)
 
+@pytest.fixture
+def audit_emitter():
+    return MagicMock(spec=AuditEmitter)
+
 
 @pytest.mark.asyncio
 async def test_agent_runtime_reads_file_with_real_tool(
@@ -32,6 +39,7 @@ async def test_agent_runtime_reads_file_with_real_tool(
     llm,
     policy_engine, 
     approval_broker,
+    audit_emitter,
     ):
     
     policy_engine.evaluate.return_value = PolicyEvaluation(
@@ -56,12 +64,19 @@ async def test_agent_runtime_reads_file_with_real_tool(
     ]
 
     workspace_boundary = WorkspacePathGuard(tmp_path)
-    tools = ToolRegistry([ReadFileTool(workspace_boundary)])
+    tools = ToolRegistry([
+        ToolRegistration(
+            tool=ReadFileTool(workspace_boundary),
+            trust_level=TrustLevel.TRUSTED,
+        )
+    ])
+    
     runtime = AgentRuntime(
         llm, 
         tools,
         policy_engine, 
         approval_broker,
+        audit_emitter,
         )
 
     result = await runtime.run("Read the file")

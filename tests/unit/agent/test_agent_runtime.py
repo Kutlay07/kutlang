@@ -5,6 +5,11 @@ from unittest.mock import MagicMock
 from harness.agent.agent_response import AgentResponse
 from harness.agent.agent_runtime import AgentRuntime
 from harness.llm.base_llm import BaseLLM
+from harness.observability.audit_emitter import AuditEmitter
+from harness.observability.audit_event_type import AuditEventType
+from harness.observability.audit_outcome import AuditOutcome
+from harness.observability.audit_policy_decision import AuditPolicyDecision
+from harness.observability.audit_policy_risk_level import AuditPolicyRiskLevel
 from harness.policy.approval_broker import ApprovalBroker
 from harness.policy.approval_result import ApprovalResult
 from harness.policy.approval_scope import ApprovalScope
@@ -12,6 +17,8 @@ from harness.policy.policy_decision import PolicyDecision
 from harness.policy.policy_engine import PolicyEngine
 from harness.policy.policy_evaluation import PolicyEvaluation
 from harness.policy.risk_level import RiskLevel
+from harness.policy.trust_level import TrustLevel
+from harness.tools.tool_registration import ToolRegistration
 from harness.tools.tool_registry import ToolRegistry
 from harness.agent.tool_call import ToolCall
 from harness.agent.tool_result import ToolResult
@@ -45,12 +52,17 @@ def approval_broker():
     return MagicMock(spec=ApprovalBroker)
 
 @pytest.fixture
-def runtime(llm, tools, policy_engine, approval_broker):
+def audit_emitter():
+    return MagicMock(spec=AuditEmitter)
+
+@pytest.fixture
+def runtime(llm, tools, policy_engine, approval_broker, audit_emitter):
     return AgentRuntime(
         llm,
         tools,
         policy_engine,
         approval_broker,
+        audit_emitter,
     )
 
 
@@ -254,6 +266,7 @@ async def test_runtime_raises_when_max_iterations_exceeded(
         tools,
         policy_engine,
         approval_broker,
+        audit_emitter,
         max_iterations=2,
     )
 
@@ -497,18 +510,30 @@ def test_execution_tools_can_be_registered_together():
     manager = ProcessManager()
     
     tools = [
-        RunCommandTool(),
-        RunBackgroundCommandTool(manager),
-        GetProcessOutputTool(manager),
-        KillProcessTool(manager),
+        ToolRegistration(
+            tool=RunCommandTool(),
+            trust_level=TrustLevel.TRUSTED,
+        ),
+        ToolRegistration(
+            tool=RunBackgroundCommandTool(manager),
+            trust_level=TrustLevel.TRUSTED,
+        ),
+        ToolRegistration(
+            tool=GetProcessOutputTool(manager),
+            trust_level=TrustLevel.TRUSTED,
+        ),
+        ToolRegistration(
+            tool=KillProcessTool(manager),
+            trust_level=TrustLevel.TRUSTED,
+        ),
     ]
     
     registry = ToolRegistry(tools)
     
-    assert registry.get("run_command") is tools[0]
-    assert registry.get("run_background_command") is tools[1]
-    assert registry.get("get_process_output") is tools[2]
-    assert registry.get("kill_process") is tools[3]
+    assert registry.get("run_command") is tools[0].tool
+    assert registry.get("run_background_command") is tools[1].tool
+    assert registry.get("get_process_output") is tools[2].tool
+    assert registry.get("kill_process") is tools[3].tool
 
 
 @pytest.mark.asyncio
@@ -543,6 +568,7 @@ async def test_runtime_does_not_execute_tool_when_approval_is_rejected(
         tools,
         policy_engine,
         approval_broker,
+        audit_emitter,
     )
     
     results = await runtime._execute_tool_calls(
@@ -590,6 +616,7 @@ async def test_runtime_executes_tool_when_approval_is_granted(
         tools,
         policy_engine,
         approval_broker,
+        audit_emitter,
     )
     
     results = await runtime._execute_tool_calls(
@@ -636,6 +663,7 @@ async def test_runtime_does_not_execute_tool_when_approval_expires(
         tools,
         policy_engine,
         approval_broker,
+        audit_emitter,
     )
     
     results = await runtime._execute_tool_calls(
@@ -683,6 +711,7 @@ async def test_runtime_does_not_execute_tool_when_approval_is_canceled(
         tools,
         policy_engine,
         approval_broker,
+        audit_emitter,
     )
     
     results = await runtime._execute_tool_calls(
@@ -728,6 +757,7 @@ async def test_runtime_denies_tool_execution_when_policy_denies(
         tools,
         policy_engine,
         approval_broker,
+        audit_emitter,
     )
     
     results = await runtime._execute_tool_calls(
@@ -796,3 +826,271 @@ async def test_runtime_does_not_execute_tool_while_approval_is_pending(
 
     tool.execute.assert_called_once()
     approval_broker.request_approval.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_runtime_emits_policy_evaluation_audit_event(
+    runtime,
+    llm,
+    tools,
+    policy_engine,
+    audit_emitter,
+    ):
+    
+    policy_engine.evaluate.return_value = PolicyEvaluation(
+        decision=PolicyDecision.ALLOW,
+        risk_level=RiskLevel.LOW,
+    )
+    
+    tool = MagicMock()
+    tool.execute.return_value = "file contents"
+    tools.get.return_value = tool
+    
+    tool_call = ToolCall(
+        call_id="call_123",
+        name="read_file",
+        arguments={"path": "main.py"},
+    )
+    
+    await runtime._execute_tool_calls(
+        AgentResponse(tool_calls=[tool_call])
+    )
+    events = [call.args[0] for call in audit_emitter.emit.call_args_list]
+    
+    policy_event = next(
+        event for event in events
+        if event.event_type == AuditEventType.POLICY_EVALUATED
+    )
+    
+    assert policy_event.outcome == AuditOutcome.SUCCESS
+    assert policy_event.tool_call_id == "call_123"
+    assert policy_event.tool_name == "read_file"
+    assert policy_event.payload.decision == AuditPolicyDecision.ALLOW
+    assert policy_event.payload.risk_level == AuditPolicyRiskLevel.LOW
+
+
+@pytest.mark.asyncio
+async def test_runtime_emits_allow_tool_lifecycle(
+    runtime,
+    llm,
+    tools,
+    policy_engine,
+    audit_emitter,
+    ):
+    
+    policy_engine.evaluate.return_value = PolicyEvaluation(
+        decision=PolicyDecision.ALLOW,
+        risk_level=RiskLevel.LOW,
+    )
+    
+    tool = MagicMock()
+    tool.execute.return_value = "file contents"
+    tools.get.return_value = tool
+    
+    tool_call = ToolCall(
+        call_id="call_123",
+        name="read_file",
+        arguments={"path": "main.py"},
+    )
+    
+    await runtime._execute_tool_calls(
+        AgentResponse(tool_calls=[tool_call])
+    )
+    events = [call.args[0] for call in audit_emitter.emit.call_args_list]
+    
+    event_types = [event.event_type for event in events]
+    
+    invocation_event = next(
+        event
+        for event in events
+        if event.event_type == AuditEventType.TOOL_INVOKED
+        )
+    
+    assert event_types == [
+    AuditEventType.POLICY_EVALUATED,
+    AuditEventType.TOOL_INVOKED,
+    AuditEventType.TOOL_COMPLETED,
+    ]
+    
+    assert invocation_event.payload.arguments == {
+        "path": "main.py",
+    }
+
+
+@pytest.mark.asyncio
+async def test_runtime_emits_ask_granted_lifecycle(
+    runtime,
+    llm,
+    tools,
+    policy_engine,
+    approval_broker,
+    audit_emitter,
+    ):
+    
+    policy_engine.evaluate.return_value = PolicyEvaluation(
+        decision=PolicyDecision.ASK,
+        risk_level=RiskLevel.HIGH,
+        approval_scope=ApprovalScope.SINGLE_CALL,
+    )
+    
+    approval_broker.request_approval.return_value = ApprovalResult.GRANTED
+    
+    tool = MagicMock()
+    tool.execute.return_value = "file contents"
+    tools.get.return_value = tool
+    
+    tool_call = ToolCall(
+        call_id="call_123",
+        name="read_file",
+        arguments={"path": "main.py"},
+    )
+    
+    await runtime._execute_tool_calls(
+        AgentResponse(tool_calls=[tool_call])
+    )
+    events = [call.args[0] for call in audit_emitter.emit.call_args_list]
+    
+    event_types = [event.event_type for event in events]
+    
+    assert event_types == [
+        AuditEventType.POLICY_EVALUATED,
+        AuditEventType.APPROVAL_REQUESTED,
+        AuditEventType.APPROVAL_COMPLETED,
+        AuditEventType.TOOL_INVOKED,
+        AuditEventType.TOOL_COMPLETED,
+    ]
+
+
+@pytest.mark.asyncio
+async def test_runtime_emits_ask_rejected_lifecycle(
+    runtime,
+    llm,
+    tools,
+    policy_engine,
+    approval_broker,
+    audit_emitter,
+    ):
+    
+    policy_engine.evaluate.return_value = PolicyEvaluation(
+        decision=PolicyDecision.ASK,
+        risk_level=RiskLevel.HIGH,
+        approval_scope=ApprovalScope.SINGLE_CALL,
+    )
+    
+    approval_broker.request_approval.return_value = ApprovalResult.REJECTED
+    
+    tool = MagicMock()
+    tool.execute.return_value = "file contents"
+    tools.get.return_value = tool
+    
+    tool_call = ToolCall(
+        call_id="call_123",
+        name="read_file",
+        arguments={"path": "main.py"},
+    )
+    
+    await runtime._execute_tool_calls(
+        AgentResponse(tool_calls=[tool_call])
+    )
+    events = [call.args[0] for call in audit_emitter.emit.call_args_list]
+    
+    event_types = [event.event_type for event in events]
+    
+    assert event_types == [
+        AuditEventType.POLICY_EVALUATED,
+        AuditEventType.APPROVAL_REQUESTED,
+        AuditEventType.APPROVAL_COMPLETED,
+    ]
+    
+    tool.execute.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_runtime_emits_allow_tool_execution_failure_lifecycle(
+    runtime,
+    llm,
+    tools,
+    policy_engine,
+    audit_emitter,
+    ):
+    
+    policy_engine.evaluate.return_value = PolicyEvaluation(
+        decision=PolicyDecision.ALLOW,
+        risk_level=RiskLevel.LOW,
+    )
+    
+    tool = MagicMock()
+    tool.execute.side_effect = RuntimeError("boom")
+    tools.get.return_value = tool
+    
+    tool_call = ToolCall(
+        call_id="call_123",
+        name="read_file",
+        arguments={"path": "main.py"},
+    )
+    
+    results = await runtime._execute_tool_calls(
+        AgentResponse(tool_calls=[tool_call])
+    )
+    
+    events = [call.args[0] for call in audit_emitter.emit.call_args_list]
+    
+    event_types = [event.event_type for event in events]
+    
+    failure_event = next(
+        event
+        for event in events
+        if event.event_type == AuditEventType.TOOL_FAILED
+    )
+
+    assert failure_event.payload.arguments == {
+        "path": "main.py",
+    }
+    assert failure_event.payload.error == "boom"
+    assert results[0].is_error is True
+    assert event_types == [
+        AuditEventType.POLICY_EVALUATED,
+        AuditEventType.TOOL_INVOKED,
+        AuditEventType.TOOL_FAILED,
+    ]
+
+
+@pytest.mark.asyncio
+async def test_audit_failure_must_not_change_tool_execution_semantics(
+    runtime,
+    llm,
+    tools,
+    policy_engine,
+    audit_emitter,
+    ):
+    
+    policy_engine.evaluate.return_value = PolicyEvaluation(
+        decision=PolicyDecision.ALLOW,
+        risk_level=RiskLevel.LOW,
+    )
+    
+    tool = MagicMock()
+    tool.execute.return_value = "file contents"
+    tools.get.return_value = tool
+    
+    audit_emitter.emit.side_effect = RuntimeError("audit failure")
+    
+    tool_call = ToolCall(
+        call_id="call_123",
+        name="read_file",
+        arguments={"path": "main.py"},
+    )
+    
+    results = await runtime._execute_tool_calls(
+        AgentResponse(tool_calls=[tool_call])
+    )
+    
+    events = [call.args[0] for call in audit_emitter.emit.call_args_list]
+    
+    event_types = [event.event_type for event in events]
+    
+    tool.execute.assert_called_once_with(path="main.py")
+    assert results[0].is_error is False
+    assert results[0].result == "file contents"
+
+
