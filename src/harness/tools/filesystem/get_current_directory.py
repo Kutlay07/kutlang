@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from ..base_tool import BaseTool
+from ..sync_base_tool import SyncBaseTool
 
 
-class GetCurrentDirectoryTool(BaseTool):
+class GetCurrentDirectoryTool(SyncBaseTool):
     @property
     def name(self) -> str:
         return "get_current_directory"

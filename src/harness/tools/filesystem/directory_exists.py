@@ -1,9 +1,9 @@
 from harness.security.workspace_boundary import WorkspaceBoundary
 
-from ..base_tool import BaseTool
+from ..sync_base_tool import SyncBaseTool
 
 
-class DirectoryExistsTool(BaseTool):
+class DirectoryExistsTool(SyncBaseTool):
     
     def __init__(self, workspace_boundary: WorkspaceBoundary):
         self.workspace_boundary = workspace_boundary

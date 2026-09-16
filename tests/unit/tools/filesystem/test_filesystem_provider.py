@@ -1,4 +1,4 @@
-from harness.tools.base_tool import BaseTool
+from harness.tools.sync_base_tool import SyncBaseTool
 from harness.tools.filesystem.provider import FilesystemToolProvider
 
 
@@ -39,4 +39,4 @@ def test_filesystem_provider_returns_base_tools(workspace_boundary):
     
     tools = provider.get_tools()
     
-    assert all(isinstance(tool, BaseTool) for tool in tools)
+    assert all(isinstance(tool, SyncBaseTool) for tool in tools)

@@ -1,6 +1,6 @@
 import pytest
 
-from harness.tools.base_tool import BaseTool
+from harness.tools.sync_base_tool import SyncBaseTool
 from harness.tools.filesystem.create_directory import CreateDirectoryTool
 
 
@@ -14,7 +14,7 @@ def test_create_directory_tool_metadata(workspace_boundary):
 def test_create_directory_tool_implements_base_tool(workspace_boundary):
     tool = CreateDirectoryTool(workspace_boundary)
 
-    assert isinstance(tool, BaseTool)
+    assert isinstance(tool, SyncBaseTool)
 
 
 def test_create_directory_tool_execute(tmp_path, workspace_boundary):

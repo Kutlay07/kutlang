@@ -1,12 +1,13 @@
+import asyncio
 import os
 import signal
 import subprocess
 
-from ..base_tool import BaseTool
+from harness.tools.async_base_tool import AsyncBaseTool
 from .process_manager import ProcessManager
 
 
-class KillProcessTool(BaseTool):
+class KillProcessTool(AsyncBaseTool):
     def __init__(self, process_manager: ProcessManager):
         self.process_manager = process_manager
 
@@ -32,12 +33,12 @@ class KillProcessTool(BaseTool):
             "additionalProperties": False,
         }
 
-    def execute(self, process_id: int) -> str:
+    async def execute(self, process_id: int) -> str:
         managed = self.process_manager.get(process_id)
         process = managed.process
 
         try:
-            if process.poll() is None:
+            if process.returncode is None:
                 if os.name == "nt":
                     subprocess.run(
                         [
@@ -58,10 +59,10 @@ class KillProcessTool(BaseTool):
                     )
 
                 try:
-                    process.wait(timeout=5)
+                    await asyncio.wait_for(process.wait(), timeout=5)
                 except subprocess.TimeoutExpired:
                     process.kill()
-                    process.wait()
+                    await process.wait()
 
             return f"Successfully terminated process: {process_id}"
         finally:

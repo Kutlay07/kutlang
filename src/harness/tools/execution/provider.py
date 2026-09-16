@@ -1,4 +1,4 @@
-from harness.tools.base_tool import BaseTool
+from harness.tools.sync_base_tool import SyncBaseTool
 from harness.tools.execution.get_process_output import GetProcessOutputTool
 from harness.tools.execution.kill_process import KillProcessTool
 from harness.tools.execution.process_manager import ProcessManager
@@ -9,7 +9,7 @@ from harness.tools.tool_provider import ToolProvider
 
 class ExecutionToolProvider(ToolProvider):
     
-    def get_tools(self) -> list[BaseTool]:
+    def get_tools(self) -> list[SyncBaseTool]:
         process_manager = ProcessManager()
         
         return [

@@ -1,4 +1,4 @@
-from harness.tools.base_tool import BaseTool
+from harness.tools.sync_base_tool import SyncBaseTool
 from harness.tools.filesystem.append_file import AppendFileTool
 
 
@@ -12,7 +12,7 @@ def test_append_file_tool_metadata(workspace_boundary):
 def test_append_file_tool_implements_base_tool(workspace_boundary):
     tool = AppendFileTool(workspace_boundary)
 
-    assert isinstance(tool, BaseTool)
+    assert isinstance(tool, SyncBaseTool)
 
 
 def test_append_file_tool_execute(tmp_path, workspace_boundary):

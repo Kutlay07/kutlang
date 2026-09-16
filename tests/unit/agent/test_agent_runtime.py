@@ -23,7 +23,7 @@ from harness.tools.tool_registry import ToolRegistry
 from harness.agent.tool_call import ToolCall
 from harness.agent.tool_result import ToolResult
 from harness.llm.message import Message
-from harness.tools.base_tool import BaseTool
+from harness.tools.sync_base_tool import SyncBaseTool
 from harness.tools.execution.run_command import RunCommandTool
 from harness.tools.execution.process_manager import ProcessManager
 from harness.tools.execution.run_background_command import (
@@ -73,7 +73,7 @@ def test_runtime_initializes_with_llm_and_tools(runtime, llm, tools):
 
 @pytest.mark.asyncio
 async def test_runtime_runs_llm(runtime, llm, tools):
-    tool = MagicMock(spec=BaseTool)
+    tool = MagicMock(spec=SyncBaseTool)
     tool.name = "read_file"
     
     tools.tools = [tool]
@@ -105,7 +105,7 @@ async def test_runtime_executes_tool_calls(
     runtime
     ):
 
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
 
@@ -145,7 +145,7 @@ async def test_runtime_sends_tool_result_back_to_llm(
         risk_level=RiskLevel.LOW,
     )
 
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
 
@@ -203,7 +203,7 @@ async def test_runtime_supports_multiple_tool_iterations(
     risk_level=RiskLevel.LOW,
     )
     
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.side_effect = [
         "first result",
         "second result",
@@ -247,7 +247,7 @@ async def test_runtime_raises_when_max_iterations_exceeded(
     approval_broker,
     ):
 
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "result"
     tools.get.return_value = tool
 
@@ -289,7 +289,7 @@ async def test_runtime_returns_tool_error_as_tool_result(
         risk_level=RiskLevel.LOW,
 )
 
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.side_effect = FileNotFoundError("File not found")
     tools.get.return_value = tool
 
@@ -387,7 +387,7 @@ async def test_runtime_formats_tool_errors_as_errors(
         risk_level=RiskLevel.LOW,
     )
     
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.side_effect = FileNotFoundError("File not found")
     tools.get.return_value = tool
 
@@ -430,7 +430,7 @@ async def test_runtime_preserves_tool_call_id(
         risk_level=RiskLevel.LOW,
     )
     
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
 
@@ -468,7 +468,7 @@ async def test_runtime_preserves_assistant_text_with_tool_calls(
         risk_level=RiskLevel.LOW,
     )
     
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
     
@@ -553,7 +553,7 @@ async def test_runtime_does_not_execute_tool_when_approval_is_rejected(
     
     approval_broker.request_approval.return_value = ApprovalResult.REJECTED
     
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
     
@@ -601,7 +601,7 @@ async def test_runtime_executes_tool_when_approval_is_granted(
     
     approval_broker.request_approval.return_value = ApprovalResult.GRANTED
     
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
     
@@ -648,7 +648,7 @@ async def test_runtime_does_not_execute_tool_when_approval_expires(
     
     approval_broker.request_approval.return_value = ApprovalResult.EXPIRED
     
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
     
@@ -696,7 +696,7 @@ async def test_runtime_does_not_execute_tool_when_approval_is_canceled(
     
     approval_broker.request_approval.return_value = ApprovalResult.CANCELED
     
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
     
@@ -742,7 +742,7 @@ async def test_runtime_denies_tool_execution_when_policy_denies(
         approval_scope=None,
     )
     
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
     
@@ -796,7 +796,7 @@ async def test_runtime_does_not_execute_tool_while_approval_is_pending(
     
     approval_broker.request_approval.side_effect = request_approval
     
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
     
@@ -842,7 +842,7 @@ async def test_runtime_emits_policy_evaluation_audit_event(
         risk_level=RiskLevel.LOW,
     )
     
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
     
@@ -883,7 +883,7 @@ async def test_runtime_emits_allow_tool_lifecycle(
         risk_level=RiskLevel.LOW,
     )
     
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
     
@@ -935,7 +935,7 @@ async def test_runtime_emits_ask_granted_lifecycle(
     
     approval_broker.request_approval.return_value = ApprovalResult.GRANTED
     
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
     
@@ -979,7 +979,7 @@ async def test_runtime_emits_ask_rejected_lifecycle(
     
     approval_broker.request_approval.return_value = ApprovalResult.REJECTED
     
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
     
@@ -1019,7 +1019,7 @@ async def test_runtime_emits_allow_tool_execution_failure_lifecycle(
         risk_level=RiskLevel.LOW,
     )
     
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.side_effect = RuntimeError("boom")
     tools.get.return_value = tool
     
@@ -1069,7 +1069,7 @@ async def test_audit_failure_must_not_change_tool_execution_semantics(
         risk_level=RiskLevel.LOW,
     )
     
-    tool = MagicMock()
+    tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
     
@@ -1092,5 +1092,3 @@ async def test_audit_failure_must_not_change_tool_execution_semantics(
     tool.execute.assert_called_once_with(path="main.py")
     assert results[0].is_error is False
     assert results[0].result == "file contents"
-
-

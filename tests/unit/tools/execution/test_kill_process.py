@@ -1,6 +1,6 @@
 import os
 import subprocess
-from unittest.mock import MagicMock, patch
+from unittest.mock import  AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -14,7 +14,8 @@ from harness.tools.execution.process_manager import (
 def make_managed_process(tmp_path):
     process = MagicMock()
     process.pid = 1234
-    process.poll.return_value = None
+    process.returncode = None
+    process.wait = AsyncMock()
 
     return ManagedProcess(
         process=process,
@@ -23,8 +24,9 @@ def make_managed_process(tmp_path):
     )
 
 
+@pytest.mark.asyncio
 @pytest.mark.skipif(os.name != "nt", reason="Windows-specific process-tree behavior")
-def test_kill_process_terminates_process_tree(tmp_path):
+async def test_kill_process_terminates_process_tree(tmp_path):
     manager = MagicMock(spec=ProcessManager)
     managed = make_managed_process(tmp_path)
 
@@ -35,7 +37,7 @@ def test_kill_process_terminates_process_tree(tmp_path):
     with patch(
         "harness.tools.execution.kill_process.subprocess.run"
     ) as run:
-        result = tool.execute(1234)
+        result = await tool.execute(1234)
 
     run.assert_called_once_with(
         [
@@ -50,14 +52,15 @@ def test_kill_process_terminates_process_tree(tmp_path):
         text=True,
     )
 
-    managed.process.wait.assert_called_once_with(timeout=5)
+    managed.process.wait.assert_called_once_with()
 
     assert result == "Successfully terminated process: 1234"
 
     manager.remove.assert_called_once_with(1234)
 
 
-def test_kill_process_waits_after_termination(tmp_path):
+@pytest.mark.asyncio
+async def test_kill_process_waits_after_termination(tmp_path):
     manager = MagicMock(spec=ProcessManager)
     managed = make_managed_process(tmp_path)
 
@@ -69,7 +72,7 @@ def test_kill_process_waits_after_termination(tmp_path):
         with patch(
             "harness.tools.execution.kill_process.subprocess.run"
         ):
-            tool.execute(1234)
+            await tool.execute(1234)
     else:
         with patch(
             "harness.tools.execution.kill_process.os.killpg"
@@ -77,13 +80,14 @@ def test_kill_process_waits_after_termination(tmp_path):
             "harness.tools.execution.kill_process.os.getpgid",
             return_value=1234,
         ):
-            tool.execute(1234)
+            await tool.execute(1234)
 
-    managed.process.wait.assert_called_once_with(timeout=5)
+    managed.process.wait.assert_called_once_with()
     manager.remove.assert_called_once_with(1234)
 
 
-def test_kill_process_falls_back_to_kill(tmp_path):
+@pytest.mark.asyncio
+async def test_kill_process_falls_back_to_kill(tmp_path):
     manager = MagicMock(spec=ProcessManager)
     managed = make_managed_process(tmp_path)
 
@@ -100,7 +104,7 @@ def test_kill_process_falls_back_to_kill(tmp_path):
         with patch(
             "harness.tools.execution.kill_process.subprocess.run"
         ):
-            tool.execute(1234)
+            await tool.execute(1234)
     else:
         with patch(
             "harness.tools.execution.kill_process.os.killpg"
@@ -108,18 +112,19 @@ def test_kill_process_falls_back_to_kill(tmp_path):
             "harness.tools.execution.kill_process.os.getpgid",
             return_value=1234,
         ):
-            tool.execute(1234)
+            await tool.execute(1234)
 
     managed.process.kill.assert_called_once_with()
     assert managed.process.wait.call_count == 2
     manager.remove.assert_called_once_with(1234)
 
 
-def test_kill_process_raises_for_unknown_process():
+@pytest.mark.asyncio
+async def test_kill_process_raises_for_unknown_process():
     manager = MagicMock(spec=ProcessManager)
     manager.get.side_effect = KeyError(9999)
 
     tool = KillProcessTool(manager)
 
     with pytest.raises(KeyError):
-        tool.execute(9999)
+        await tool.execute(9999)
