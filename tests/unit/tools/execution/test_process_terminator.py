@@ -24,6 +24,7 @@ async def test_terminate_does_nothing_for_finished_process():
 
 @pytest.mark.asyncio
 async def test_terminate_stops_running_process():
+    creationflags = 0
     start_new_session = False
 
     if os.name == "nt":
