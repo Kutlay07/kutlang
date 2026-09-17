@@ -18,6 +18,7 @@ from harness.policy.policy_engine import PolicyEngine
 from harness.policy.policy_evaluation import PolicyEvaluation
 from harness.policy.risk_level import RiskLevel
 from harness.policy.trust_level import TrustLevel
+from harness.tools.execution.process_terminator import ProcessTerminator
 from harness.tools.tool_registration import ToolRegistration
 from harness.tools.tool_registry import ToolRegistry
 from harness.agent.tool_call import ToolCall
@@ -511,11 +512,11 @@ def test_execution_tools_can_be_registered_together():
     
     tools = [
         ToolRegistration(
-            tool=RunCommandTool(),
+            tool=RunCommandTool(ProcessTerminator()),
             trust_level=TrustLevel.TRUSTED,
         ),
         ToolRegistration(
-            tool=RunBackgroundCommandTool(manager),
+            tool=RunBackgroundCommandTool(manager, ProcessTerminator()),
             trust_level=TrustLevel.TRUSTED,
         ),
         ToolRegistration(
@@ -523,7 +524,7 @@ def test_execution_tools_can_be_registered_together():
             trust_level=TrustLevel.TRUSTED,
         ),
         ToolRegistration(
-            tool=KillProcessTool(manager),
+            tool=KillProcessTool(manager, ProcessTerminator()),
             trust_level=TrustLevel.TRUSTED,
         ),
     ]

@@ -1,3 +1,4 @@
+from harness.tools.execution.process_terminator import ProcessTerminator
 from harness.tools.sync_base_tool import SyncBaseTool
 from harness.tools.execution.get_process_output import GetProcessOutputTool
 from harness.tools.execution.kill_process import KillProcessTool
@@ -11,10 +12,11 @@ class ExecutionToolProvider(ToolProvider):
     
     def get_tools(self) -> list[SyncBaseTool]:
         process_manager = ProcessManager()
+        process_terminator = ProcessTerminator()
         
         return [
             GetProcessOutputTool(process_manager),
-            KillProcessTool(process_manager),
-            RunBackgroundCommandTool(process_manager),
-            RunCommandTool(),
+            KillProcessTool(process_manager, process_terminator),
+            RunBackgroundCommandTool(process_manager, process_terminator),
+            RunCommandTool(process_terminator),
         ]

@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from harness.tools.execution.process_terminator import ProcessTerminator
 from harness.tools.sync_base_tool import SyncBaseTool
 from harness.tools.tool_registry import ToolRegistry
 from harness.tools.execution.run_command import RunCommandTool
@@ -70,7 +71,7 @@ def test_registry_exposes_registered_tools():
 
 
 def test_registry_registers_run_command_tool():
-    tool = RunCommandTool()
+    tool = RunCommandTool(ProcessTerminator())
     registry = ToolRegistry([
         ToolRegistration(
             tool=tool,

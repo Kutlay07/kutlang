@@ -8,12 +8,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from harness.tools.execution.process_terminator import ProcessTerminator
 from harness.tools.execution.run_command import RunCommandTool
 
 
 @pytest.mark.asyncio
 async def test_run_command_executes_command():
-    tool = RunCommandTool()
+    tool = RunCommandTool(ProcessTerminator())
 
     result = await tool.execute(
         command="python -c \"print('hello')\""
@@ -29,7 +30,7 @@ async def test_run_command_executes_command():
 
 @pytest.mark.asyncio
 async def test_run_command_returns_stderr():
-    tool = RunCommandTool()
+    tool = RunCommandTool(ProcessTerminator())
 
     result = await tool.execute(
         command="python -c \"import sys; sys.stderr.write('error')\""
@@ -45,7 +46,7 @@ async def test_run_command_returns_stderr():
 
 @pytest.mark.asyncio
 async def test_run_command_returns_exit_code():
-    tool = RunCommandTool()
+    tool = RunCommandTool(ProcessTerminator())
 
     result = await tool.execute(
         command="python -c \"raise SystemExit(3)\""
@@ -56,7 +57,7 @@ async def test_run_command_returns_exit_code():
 
 @pytest.mark.asyncio
 async def test_run_command_handles_timeout():
-    tool = RunCommandTool()
+    tool = RunCommandTool(ProcessTerminator())
 
     result = await tool.execute(
         command="python -c \"import time; time.sleep(2)\"",
@@ -68,7 +69,7 @@ async def test_run_command_handles_timeout():
 
 @pytest.mark.asyncio
 async def test_run_command_handles_execution_error():
-    tool = RunCommandTool()
+    tool = RunCommandTool(ProcessTerminator())
 
     result = await tool.execute(
         command="this-command-does-not-exist-12345"
@@ -80,7 +81,7 @@ async def test_run_command_handles_execution_error():
 
 @pytest.mark.asyncio
 async def test_run_command_times_out():
-    tool = RunCommandTool()
+    tool = RunCommandTool(ProcessTerminator())
 
     result = await tool.execute(
         command="python -c \"import time; time.sleep(10)\"",
@@ -92,7 +93,7 @@ async def test_run_command_times_out():
 
 @pytest.mark.asyncio
 async def test_run_command_accepts_timeout():
-    tool = RunCommandTool()
+    tool = RunCommandTool(ProcessTerminator())
 
     result = await tool.execute(
         command="python -c \"print('hello')\"",
@@ -109,7 +110,7 @@ async def test_run_command_accepts_timeout():
 
 @pytest.mark.asyncio
 async def test_run_command_handles_nonzero_exit_code():
-    tool = RunCommandTool()
+    tool = RunCommandTool(ProcessTerminator())
 
     result = await tool.execute(
         command="python -c \"raise SystemExit(42)\""
@@ -120,7 +121,7 @@ async def test_run_command_handles_nonzero_exit_code():
 
 @pytest.mark.asyncio
 async def test_run_command_combines_stdout_and_stderr():
-    tool = RunCommandTool()
+    tool = RunCommandTool(ProcessTerminator())
 
     result = await tool.execute(
         command=(
@@ -151,7 +152,7 @@ async def test_run_command_uses_process_group_on_windows():
         "harness.tools.execution.run_command.asyncio.create_subprocess_shell",
         return_value=process,
     ) as create_subprocess_shell:
-        tool = RunCommandTool()
+        tool = RunCommandTool(ProcessTerminator())
 
         result = await tool.execute(
             "python -c \"print('hello')\""
@@ -187,18 +188,18 @@ async def test_run_command_kills_process_tree_on_timeout():
         "harness.tools.execution.run_command.asyncio.create_subprocess_shell",
         return_value=process,
     ), patch.object(
-        RunCommandTool,
-        "_terminate_process_group",
+        ProcessTerminator,
+        "terminate",
         new_callable=AsyncMock,
-    ) as terminate_process_group:
-        tool = RunCommandTool()
+    ) as terminate_process:
+        tool = RunCommandTool(ProcessTerminator())
 
         result = await tool.execute(
             "python -c \"import time; time.sleep(10)\"",
             timeout=1,
         )
 
-    terminate_process_group.assert_awaited_once_with(process)
+    terminate_process.assert_awaited_once_with(process)
 
     assert result == "Command timed out after 1 seconds"
 
@@ -220,7 +221,7 @@ async def test_terminate_process_group_terminates_real_process():
     )
 
     try:
-        await RunCommandTool._terminate_process_group(process)
+        await ProcessTerminator().terminate(process)
 
         assert process.returncode is not None
     finally:
@@ -280,7 +281,7 @@ time.sleep(10)
 
         assert started_path.exists(), "child process never started"
 
-        await RunCommandTool._terminate_process_group(parent_process)
+        await ProcessTerminator().terminate(parent_process)
 
         await asyncio.sleep(4)
 
@@ -296,7 +297,7 @@ time.sleep(10)
 
 @pytest.mark.asyncio
 async def test_timeout_with_cleanup_failure():
-    tool = RunCommandTool()
+    tool = RunCommandTool(ProcessTerminator())
 
     process = MagicMock()
     process.communicate = AsyncMock(
@@ -309,8 +310,8 @@ async def test_timeout_with_cleanup_failure():
         "harness.tools.execution.run_command.asyncio.create_subprocess_shell",
         return_value=process,
     ), patch.object(
-        RunCommandTool,
-        "_terminate_process_group",
+        ProcessTerminator,
+        "terminate",
         new_callable=AsyncMock,
         side_effect=RuntimeError("cleanup failed"),
     ):
@@ -324,7 +325,7 @@ async def test_timeout_with_cleanup_failure():
 
 
 @pytest.mark.asyncio
-async def test_cancellation():
+async def test_cancellation_preserves_cancelled_error_when_cleanup_fails():
     process = MagicMock()
     process.communicate = AsyncMock(
         side_effect=asyncio.CancelledError
@@ -337,23 +338,25 @@ async def test_cancellation():
         "harness.tools.execution.run_command.asyncio.create_subprocess_shell",
         return_value=process,
     ), patch.object(
-        RunCommandTool,
-        "_terminate_process_group",
+        ProcessTerminator,
+        "terminate",
         new_callable=AsyncMock,
-    ) as terminate_process_group:
+        side_effect=RuntimeError("cleanup failed"),
+    ) as terminate_process:
 
-        tool = RunCommandTool()
+        tool = RunCommandTool(ProcessTerminator())
 
         with pytest.raises(asyncio.CancelledError):
             await tool.execute(
                 "python -c \"import time; time.sleep(10)\""
             )
 
-    terminate_process_group.assert_awaited_once_with(process)
+    terminate_process.assert_awaited_once_with(process)
+
 
 @pytest.mark.asyncio
 async def test_real_cancellation():
-    tool = RunCommandTool()
+    tool = RunCommandTool(ProcessTerminator())
 
     task = asyncio.create_task(
         tool.execute(
@@ -393,8 +396,7 @@ marker.write_text("alive")
         str(child_script),
     ])
 
-
-    tool = RunCommandTool()
+    tool = RunCommandTool(ProcessTerminator())
 
     task = asyncio.create_task(
         tool.execute(command)

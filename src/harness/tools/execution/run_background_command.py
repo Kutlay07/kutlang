@@ -5,12 +5,18 @@ import subprocess
 import tempfile
 
 from harness.tools.async_base_tool import AsyncBaseTool
+from harness.tools.execution.process_terminator import ProcessTerminator
 from .process_manager import ManagedProcess, ProcessManager
 
 
 class RunBackgroundCommandTool(AsyncBaseTool):
-    def __init__(self, process_manager: ProcessManager):
+    def __init__(
+        self, 
+        process_manager: ProcessManager,
+        process_terminator: ProcessTerminator,
+        ):
         self.process_manager = process_manager
+        self.process_terminator = process_terminator
 
     @property
     def name(self) -> str:
@@ -56,15 +62,30 @@ class RunBackgroundCommandTool(AsyncBaseTool):
             if os.name == "nt":
                 creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
             else:
-                start_new_session=True
+                start_new_session = True
 
-            process = await asyncio.create_subprocess_shell(
-                command,
-                stdout=stdout_file,
-                stderr=stderr_file,
-                creationflags=creationflags,
-                start_new_session=start_new_session
+            creation_task = asyncio.create_task(
+                asyncio.create_subprocess_shell(
+                    command,
+                    stdout=stdout_file,
+                    stderr=stderr_file,
+                    creationflags=creationflags,
+                    start_new_session=start_new_session
+                    )
             )
+            process = await asyncio.shield(creation_task)
+
+        except asyncio.CancelledError:
+            try:
+                process = await creation_task
+                await self.process_terminator.terminate(process)
+            finally:
+                stdout_file.close()
+                stderr_file.close()
+                stdout_path.unlink(missing_ok=True)
+                stderr_path.unlink(missing_ok=True)
+            raise
+
         except Exception:
             stdout_file.close()
             stderr_file.close()

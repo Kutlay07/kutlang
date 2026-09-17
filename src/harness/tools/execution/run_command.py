@@ -4,9 +4,14 @@ import signal
 import subprocess
 
 from harness.tools.async_base_tool import AsyncBaseTool
+from .process_terminator import ProcessTerminator
 
 
 class RunCommandTool(AsyncBaseTool):
+
+    def __init__(self, process_terminator: ProcessTerminator):
+        self.process_terminator = process_terminator
+
     @property
     def name(self) -> str:
         return "run_command"
@@ -62,7 +67,7 @@ class RunCommandTool(AsyncBaseTool):
 
         except asyncio.TimeoutError:
             try:
-                await self._terminate_process_group(process)
+                await self.process_terminator.terminate(process)
                 return f"Command timed out after {timeout} seconds"
 
             except Exception as exc:
@@ -72,7 +77,10 @@ class RunCommandTool(AsyncBaseTool):
                 )
 
         except asyncio.CancelledError:
-            await self._terminate_process_group(process)
+            try:
+                await self.process_terminator.terminate(process)
+            except Exception:
+                pass
             raise
 
         stdout = stdout.decode().replace("\r\n", "\n")
@@ -83,39 +91,3 @@ class RunCommandTool(AsyncBaseTool):
             f"STDOUT:\n{stdout}"
             f"STDERR:\n{stderr}"
         )
-
-
-    @staticmethod
-    async def _terminate_process_group(
-        process: asyncio.subprocess.Process,
-        ) -> None:
-
-        if process.returncode is not None:
-            return
-
-        if os.name == "nt":
-            subprocess.run(
-                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            await process.wait()
-
-        else:
-            try:
-                pgid = os.getpgid(process.pid)
-
-                if pgid <= 1:
-                    return
-
-                os.killpg(pgid, signal.SIGTERM)
-
-                await asyncio.wait_for(
-                    process.wait(),
-                    timeout=2,
-                )
-
-            except asyncio.TimeoutError:
-                os.killpg(pgid, signal.SIGKILL)
-                await process.wait()
