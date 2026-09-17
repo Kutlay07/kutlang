@@ -1,3 +1,5 @@
+from typing import cast
+
 import pytest
 
 from harness.policy.approval_scope import ApprovalScope
@@ -48,3 +50,13 @@ def test_default_policy_engine_all_situations(risk_level, decision, approval_sco
     assert evaluation.risk_level == risk_level
     assert evaluation.decision == decision
     assert evaluation.approval_scope == approval_scope
+
+
+def test_policy_engine_denies_unknown_risk_level():
+    policy_engine = DefaultPolicyEngine(
+        DummyRiskClassifier(RiskLevel.LOW)
+        )
+
+    unknown_risk_level = cast(RiskLevel, object())
+    
+    assert policy_engine._decide(unknown_risk_level) == PolicyDecision.DENY

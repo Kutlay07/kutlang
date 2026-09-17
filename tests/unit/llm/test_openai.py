@@ -4,7 +4,7 @@ from harness.llm.base_llm import BaseLLM
 from harness.llm.message import Message
 from harness.llm.openai import OpenAILLM
 from harness.agent.agent_response import AgentResponse
-from harness.tools.sync_base_tool import SyncBaseTool
+from harness.tools.sync_base_tool import BaseTool
 from harness.agent.tool_call import ToolCall
 from harness.agent.tool_result import ToolResult
 
@@ -40,7 +40,7 @@ def test_openai_llm_generate():
             Message(role="user", content="Hello"),
         ]
         
-        tool = MagicMock(spec=SyncBaseTool)
+        tool = MagicMock(spec=BaseTool)
 
         tool.name = "read_file"
         tool.description = "Read the contents of a file"
@@ -112,7 +112,7 @@ def test_openai_llm_parses_tool_calls():
             )
         ]
 
-        tool = MagicMock(spec=SyncBaseTool)
+        tool = MagicMock(spec=BaseTool)
         tool.name = "read_file"
         tool.description = "Read the contents of a file"
         tool.parameters = {
@@ -168,7 +168,7 @@ def test_openai_llm_builds_tool_call_and_result_input():
             ),
         ]
 
-        tool = MagicMock(spec=SyncBaseTool)
+        tool = MagicMock(spec=BaseTool)
         tool.name = "read_file"
         tool.description = "Read the contents of a file"
         tool.parameters = {

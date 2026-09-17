@@ -2,16 +2,16 @@ import inspect
 
 import pytest
 
-from harness.tools.sync_base_tool import SyncBaseTool
+from harness.tools.sync_base_tool import BaseTool
 
 
 def test_base_tool_is_abstract():
     with pytest.raises(TypeError):
-        SyncBaseTool()
+        BaseTool()
 
 
 def test_tool_subclass_must_implement_all_members():
-    class IncompleteTool(SyncBaseTool):
+    class IncompleteTool(BaseTool):
         pass
 
     with pytest.raises(TypeError):
@@ -19,7 +19,7 @@ def test_tool_subclass_must_implement_all_members():
 
 
 def test_tool_subclass_can_implement_all_members():
-    class TestTool(SyncBaseTool):
+    class TestTool(BaseTool):
         @property
         def name(self) -> str:
             return "test_tool"
@@ -46,7 +46,7 @@ def test_tool_subclass_can_implement_all_members():
 
 
 def test_tool_subclass_must_implement_parameters():
-    class IncompleteTool(SyncBaseTool):
+    class IncompleteTool(BaseTool):
         @property
         def name(self) -> str:
             return "test"

@@ -2,7 +2,7 @@ from openai import OpenAI
 import json
 
 from harness.agent.agent_response import AgentResponse
-from harness.tools.sync_base_tool import SyncBaseTool
+from harness.tools.base_tool import BaseTool
 from harness.agent.tool_call import ToolCall
 from harness.agent.tool_result import ToolResult
 
@@ -76,7 +76,7 @@ class OpenAILLM(BaseLLM):
     def generate(
         self,
         conversation: list[ConversationItem],
-        tools: list[SyncBaseTool],
+        tools: list[BaseTool],
     ) -> AgentResponse:
         response = self.client.responses.create(
             model=self.model,
