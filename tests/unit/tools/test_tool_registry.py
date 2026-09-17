@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from harness.tools.execution.process_terminator import ProcessTerminator
-from harness.tools.sync_base_tool import SyncBaseTool
+from harness.tools.sync_base_tool import BaseTool
 from harness.tools.tool_registry import ToolRegistry
 from harness.tools.execution.run_command import RunCommandTool
 from harness.policy.trust_level import TrustLevel
@@ -11,7 +11,7 @@ from harness.tools.tool_registration import ToolRegistration
 
 
 def test_registry_stores_tools_by_name():
-    tool = MagicMock(spec=SyncBaseTool)
+    tool = MagicMock(spec=BaseTool)
     type(tool).name = property(lambda _: "read_file")
 
     registry = ToolRegistry([
@@ -25,10 +25,10 @@ def test_registry_stores_tools_by_name():
 
 
 def test_registry_supports_multiple_tools():
-    read_file = MagicMock(spec=SyncBaseTool)
+    read_file = MagicMock(spec=BaseTool)
     type(read_file).name = property(lambda _: "read_file")
 
-    write_file = MagicMock(spec=SyncBaseTool)
+    write_file = MagicMock(spec=BaseTool)
     type(write_file).name = property(lambda _: "write_file")
 
     registry1 = ToolRegistry([
@@ -57,7 +57,7 @@ def test_registry_raises_for_unknown_tool():
 
 
 def test_registry_exposes_registered_tools():
-    tool = MagicMock(spec=SyncBaseTool)
+    tool = MagicMock(spec=BaseTool)
     tool.name = "read_file"
 
     registry = ToolRegistry([
@@ -84,7 +84,7 @@ def test_registry_registers_run_command_tool():
 
 
 def test_registry_returns_registration():
-    tool = MagicMock(spec=SyncBaseTool)
+    tool = MagicMock(spec=BaseTool)
     type(tool).name = property(lambda _: "read_file")
     
     registration = ToolRegistration(

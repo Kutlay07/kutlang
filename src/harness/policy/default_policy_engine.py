@@ -49,6 +49,8 @@ class DefaultPolicyEngine(PolicyEngine):
         elif risk_level == RiskLevel.CRITICAL:
             return PolicyDecision.DENY
 
+        return PolicyDecision.DENY
+
 
     def _scope(self, decision: PolicyDecision) -> ApprovalScope | None:
         if decision == PolicyDecision.ALLOW:

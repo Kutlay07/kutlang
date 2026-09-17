@@ -3,7 +3,7 @@ import json
 
 from .base_llm import BaseLLM
 from harness.agent.agent_response import AgentResponse
-from harness.tools.sync_base_tool import SyncBaseTool
+from harness.tools.base_tool import BaseTool
 from .message import Message
 from harness.agent.tool_call import ToolCall
 from harness.agent.tool_result import ToolResult
@@ -110,7 +110,7 @@ class LocalLLM(BaseLLM):
     def generate(
         self,
         conversation,
-        tools: list[SyncBaseTool],
+        tools: list[BaseTool],
     ) -> AgentResponse:
         chat = self._build_input(conversation)
         
