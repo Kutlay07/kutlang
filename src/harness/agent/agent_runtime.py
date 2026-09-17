@@ -33,6 +33,8 @@ from harness.policy.policy_engine import PolicyEngine
 from harness.policy.tool_arguments import ToolArguments
 from harness.policy.tool_execution_request import ToolExecutionRequest
 from harness.tools.tool_registry import ToolRegistry
+from harness.tools.async_base_tool import AsyncBaseTool
+from harness.tools.sync_base_tool import SyncBaseTool
 
 
 logger = logging.getLogger(__name__)
@@ -135,7 +137,7 @@ class AgentRuntime:
                 logger.exception("Failed to emit audit event")
                 
             if evaluation.decision == PolicyDecision.ALLOW:
-                result = self._execute_tool_call(tool_call)
+                result = await self._execute_tool_call(tool_call)
                 results.append(result)
                 
             elif evaluation.decision == PolicyDecision.ASK:
@@ -169,7 +171,7 @@ class AgentRuntime:
                     logger.exception("Failed to emit audit event")
                     
                 if approval_result == ApprovalResult.GRANTED:
-                    result = self._execute_tool_call(tool_call)
+                    result = await self._execute_tool_call(tool_call)
                     results.append(result)
                     
                 elif approval_result == ApprovalResult.REJECTED:
@@ -203,7 +205,7 @@ class AgentRuntime:
         return results
 
 
-    def _execute_tool_call(
+    async def _execute_tool_call(
         self,
         tool_call,
     ) -> ToolResult:
@@ -226,7 +228,16 @@ class AgentRuntime:
             
         try:
             tool = self.tools.get(tool_call.name)
-            result = tool.execute(**tool_call.arguments)
+
+            if isinstance(tool, AsyncBaseTool):
+                result = await tool.execute(**tool_call.arguments)
+            elif isinstance(tool, SyncBaseTool):
+                result = tool.execute(**tool_call.arguments)
+            else:
+                raise TypeError(
+                    f"Tool '{tool_call.name}' does not implement a supported tool contract."
+                )
+
             is_error = False
             
             try:

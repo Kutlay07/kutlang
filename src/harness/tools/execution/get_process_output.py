@@ -1,8 +1,8 @@
-from ..base_tool import BaseTool
+from harness.tools.async_base_tool import AsyncBaseTool
 from .process_manager import ProcessManager
 
 
-class GetProcessOutputTool(BaseTool):
+class GetProcessOutputTool(AsyncBaseTool):
     def __init__(self, process_manager: ProcessManager):
         self.process_manager = process_manager
 
@@ -28,11 +28,11 @@ class GetProcessOutputTool(BaseTool):
             "additionalProperties": False,
         }
 
-    def execute(self, process_id: int) -> str:
+    async def execute(self, process_id: int) -> str:
         managed = self.process_manager.get(process_id)
 
         try:
-            managed.process.wait()
+            await managed.process.wait()
 
             stdout = managed.stdout_path.read_text(encoding="utf-8")
             stderr = managed.stderr_path.read_text(encoding="utf-8")

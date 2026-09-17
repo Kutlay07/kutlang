@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -11,10 +11,11 @@ from harness.tools.execution.process_manager import (
     ProcessManager,
 )
 
-
-def test_get_process_output_returns_stdout_and_stderr(tmp_path):
+@pytest.mark.asyncio
+async def test_get_process_output_returns_stdout_and_stderr(tmp_path):
     manager = MagicMock(spec=ProcessManager)
     process = MagicMock()
+    process.wait = AsyncMock()
 
     stdout_path = tmp_path / "stdout.txt"
     stderr_path = tmp_path / "stderr.txt"
@@ -32,7 +33,7 @@ def test_get_process_output_returns_stdout_and_stderr(tmp_path):
 
     tool = GetProcessOutputTool(manager)
 
-    result = tool.execute(1234)
+    result = await tool.execute(1234)
 
     process.wait.assert_called_once_with()
 
@@ -50,9 +51,11 @@ def test_get_process_output_returns_stdout_and_stderr(tmp_path):
     assert not stderr_path.exists()
 
 
-def test_get_process_output_cleans_up_when_read_fails(tmp_path):
+@pytest.mark.asyncio
+async def test_get_process_output_cleans_up_when_read_fails(tmp_path):
     manager = MagicMock(spec=ProcessManager)
     process = MagicMock()
+    process.wait = AsyncMock()
 
     stdout_path = tmp_path / "stdout.txt"
     stderr_path = tmp_path / "stderr.txt"
@@ -73,18 +76,19 @@ def test_get_process_output_cleans_up_when_read_fails(tmp_path):
     stdout_path.unlink()
 
     with pytest.raises(FileNotFoundError):
-        tool.execute(1234)
+        await tool.execute(1234)
 
     manager.remove.assert_called_once_with(1234)
 
     assert not stderr_path.exists()
 
 
-def test_get_process_output_raises_for_unknown_process():
+@pytest.mark.asyncio
+async def test_get_process_output_raises_for_unknown_process():
     manager = MagicMock(spec=ProcessManager)
     manager.get.side_effect = KeyError(9999)
 
     tool = GetProcessOutputTool(manager)
 
     with pytest.raises(KeyError):
-        tool.execute(9999)
+        await tool.execute(9999)

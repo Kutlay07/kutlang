@@ -1,6 +1,6 @@
-from .base_tool import BaseTool
+from .sync_base_tool import SyncBaseTool
 
 
 __all__=[
-    "BaseTool",
+    "SyncBaseTool",
 ]

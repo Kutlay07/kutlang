@@ -2,10 +2,10 @@ import shutil
 
 from harness.security.workspace_boundary import WorkspaceBoundary
 
-from ..base_tool import BaseTool
+from ..sync_base_tool import SyncBaseTool
 
 
-class CopyFileTool(BaseTool):
+class CopyFileTool(SyncBaseTool):
     
     def __init__(self, workspace_boundary: WorkspaceBoundary):
         self.workspace_boundary = workspace_boundary

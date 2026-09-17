@@ -1,4 +1,4 @@
-from .base_tool import BaseTool
+from .sync_base_tool import SyncBaseTool
 from .tool_registration import ToolRegistration
 
 
@@ -10,14 +10,14 @@ class ToolRegistry:
             registration.tool.name: registration
             for registration in registrations}
 
-    def get(self, name: str) -> BaseTool:
+    def get(self, name: str) -> SyncBaseTool:
         return self._tools[name].tool
 
     def get_registration(self, name: str) -> ToolRegistration:
         return self._tools[name]
 
     @property
-    def tools(self) -> list[BaseTool]:
+    def tools(self) -> list[SyncBaseTool]:
         return [
             registration.tool
             for registration in self._tools.values()

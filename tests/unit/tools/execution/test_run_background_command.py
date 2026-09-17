@@ -1,19 +1,22 @@
+import asyncio
 import subprocess
 import pytest
 import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from harness.tools.execution.process_manager import (
     ManagedProcess,
     ProcessManager,
 )
+from harness.tools.execution.process_terminator import ProcessTerminator
 from harness.tools.execution.run_background_command import (
     RunBackgroundCommandTool,
 )
 
 
-def test_run_background_command_starts_process(tmp_path):
+@pytest.mark.asyncio
+async def test_run_background_command_starts_process(tmp_path):
     manager = MagicMock(spec=ProcessManager)
     process = MagicMock()
     process.pid = 1234
@@ -25,15 +28,20 @@ def test_run_background_command_starts_process(tmp_path):
         "harness.tools.execution.run_background_command.tempfile.NamedTemporaryFile",
         side_effect=[stdout_file, stderr_file],
     ), patch(
-        "harness.tools.execution.run_background_command.subprocess.Popen",
+        "harness.tools.execution.run_background_command.asyncio.create_subprocess_shell",
+        new_callable=AsyncMock,
         return_value=process,
     ) as popen:
         stdout_file.name = str(tmp_path / "stdout.txt")
         stderr_file.name = str(tmp_path / "stderr.txt")
 
-        tool = RunBackgroundCommandTool(manager)
+        terminator = MagicMock(spec=ProcessTerminator)
+        tool = RunBackgroundCommandTool(
+            manager,
+            terminator,
+        )
 
-        result = tool.execute("python server.py")
+        result = await tool.execute("python server.py")
 
     assert result == "Started process: 1234"
 
@@ -46,8 +54,13 @@ def test_run_background_command_starts_process(tmp_path):
     assert managed.stdout_path == Path(stdout_file.name)
     assert managed.stderr_path == Path(stderr_file.name)
 
-@pytest.mark.skipif(os.name != "nt", reason="Windows-specific process-tree behavior")
-def test_run_background_command_uses_process_group(tmp_path):
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    os.name != "nt",
+    reason="Windows-specific process-tree behavior",
+)
+async def test_run_background_command_uses_process_group(tmp_path):
     manager = MagicMock(spec=ProcessManager)
     process = MagicMock()
     process.pid = 1234
@@ -62,24 +75,119 @@ def test_run_background_command_uses_process_group(tmp_path):
         "harness.tools.execution.run_background_command.tempfile.NamedTemporaryFile",
         side_effect=[stdout_file, stderr_file],
     ), patch(
-        "harness.tools.execution.run_background_command.subprocess.Popen",
+        "harness.tools.execution.run_background_command.asyncio.create_subprocess_shell",
+        new_callable=AsyncMock,
         return_value=process,
     ) as popen:
-        tool = RunBackgroundCommandTool(manager)
+        terminator = MagicMock(spec=ProcessTerminator)
 
-        tool.execute("python server.py")
+        tool = RunBackgroundCommandTool(
+            manager,
+            terminator,
+        )
+        
 
-    expected_creationflags = (
-        subprocess.CREATE_NEW_PROCESS_GROUP
-        if os.name == "nt"
-        else 0
-    )
-
-    popen.assert_called_once_with(
+        await tool.execute("python server.py")
+    popen.assert_awaited_once_with(
         "python server.py",
-        shell=True,
         stdout=stdout_file,
         stderr=stderr_file,
-        text=True,
-        creationflags=expected_creationflags,
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+        start_new_session=False,
     )
+
+
+@pytest.mark.asyncio
+async def test_run_background_command_cleans_up_temp_files_on_cancellation(
+    tmp_path,
+):
+    manager = MagicMock(spec=ProcessManager)
+
+    stdout_path = tmp_path / "stdout.txt"
+    stderr_path = tmp_path / "stderr.txt"
+
+    stdout_file = MagicMock()
+    stderr_file = MagicMock()
+
+    with patch(
+        "harness.tools.execution.run_background_command.tempfile.NamedTemporaryFile",
+        side_effect=[stdout_file, stderr_file],
+    ), patch(
+        "harness.tools.execution.run_background_command.asyncio.create_subprocess_shell",
+        new_callable=AsyncMock,
+        side_effect=asyncio.CancelledError,
+    ), patch(
+        "harness.tools.execution.run_background_command.Path.unlink",
+    ) as unlink:
+        terminator = MagicMock(spec=ProcessTerminator)
+
+        tool = RunBackgroundCommandTool(
+            manager,
+            terminator,
+        )
+
+        with pytest.raises(asyncio.CancelledError):
+            await tool.execute("python server.py")
+
+    assert unlink.call_count == 2
+    stdout_file.close.assert_called_once_with()
+    stderr_file.close.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_run_background_command_cleans_up_created_process_on_cancellation(
+    tmp_path,
+):
+    manager = MagicMock(spec=ProcessManager)
+
+    stdout_file = MagicMock()
+    stderr_file = MagicMock()
+
+    stdout_file.name = str(tmp_path / "stdout.txt")
+    stderr_file.name = str(tmp_path / "stderr.txt")
+
+    creation_started = asyncio.Event()
+    allow_creation = asyncio.Event()
+
+    process = MagicMock()
+    process.pid = 1234
+
+    async def fake_create_process(*args, **kwargs):
+        creation_started.set()
+
+        try:
+            await allow_creation.wait()
+        except asyncio.CancelledError:
+            return process
+
+        return process
+
+    with patch(
+        "harness.tools.execution.run_background_command.tempfile.NamedTemporaryFile",
+        side_effect=[stdout_file, stderr_file],
+    ), patch(
+        "harness.tools.execution.run_background_command.asyncio.create_subprocess_shell",
+        side_effect=fake_create_process,
+    ):
+        terminator = MagicMock(spec=ProcessTerminator)
+
+        tool = RunBackgroundCommandTool(
+            manager,
+            terminator,
+        )
+
+        task = asyncio.create_task(
+            tool.execute("python server.py")
+        )
+
+        await creation_started.wait()
+
+        task.cancel()
+        allow_creation.set()
+
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        manager.add.assert_not_called()
+        
+        terminator.terminate.assert_awaited_once_with(process)

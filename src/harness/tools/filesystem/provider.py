@@ -1,4 +1,4 @@
-from harness.tools.base_tool import BaseTool
+from harness.tools.sync_base_tool import SyncBaseTool
 from harness.security.workspace_boundary import WorkspaceBoundary
 from harness.tools.filesystem.append_file import AppendFileTool
 from harness.tools.filesystem.copy_file import CopyFileTool
@@ -22,7 +22,7 @@ class FilesystemToolProvider(ToolProvider):
     def __init__(self, workspace_boundary: WorkspaceBoundary):
         self.workspace_boundary = workspace_boundary
     
-    def get_tools(self) -> list[BaseTool]:
+    def get_tools(self) -> list[SyncBaseTool]:
         return [
             AppendFileTool(self.workspace_boundary),
             CopyFileTool(self.workspace_boundary),

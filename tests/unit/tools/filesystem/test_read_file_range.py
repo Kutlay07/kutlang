@@ -1,6 +1,6 @@
 import pytest
 
-from harness.tools.base_tool import BaseTool
+from harness.tools.sync_base_tool import SyncBaseTool
 from harness.tools.filesystem.read_file_range import (
     ReadFileRangeTool,
 )
@@ -18,7 +18,7 @@ def test_read_file_range_tool_metadata(workspace_boundary):
 def test_read_file_range_tool_implements_base_tool(workspace_boundary):
     tool = ReadFileRangeTool(workspace_boundary)
 
-    assert isinstance(tool, BaseTool)
+    assert isinstance(tool, SyncBaseTool)
 
 
 def test_read_file_range_tool_execute(tmp_path,workspace_boundary):

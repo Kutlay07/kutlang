@@ -7,7 +7,7 @@ from harness.llm.local import LocalLLM
 from harness.agent.agent_response import AgentResponse
 from harness.agent.tool_call import ToolCall
 from harness.agent.tool_result import ToolResult
-from harness.tools.base_tool import BaseTool
+from harness.tools.sync_base_tool import SyncBaseTool
 
 
 
@@ -127,7 +127,7 @@ def test_tool_result_build_input():
 
 
 def test_format_tools():
-    class FakeTool(BaseTool):
+    class FakeTool(SyncBaseTool):
         @property
         def name(self):
             return "read_file"

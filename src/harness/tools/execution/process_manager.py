@@ -1,11 +1,11 @@
+import asyncio
 from dataclasses import dataclass
 from pathlib import Path
-import subprocess
 
 
 @dataclass
 class ManagedProcess:
-    process: subprocess.Popen
+    process: asyncio.subprocess.Process
     stdout_path: Path
     stderr_path: Path
 

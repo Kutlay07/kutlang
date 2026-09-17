@@ -1,4 +1,4 @@
-from harness.tools.base_tool import BaseTool
+from harness.tools.sync_base_tool import SyncBaseTool
 from harness.tools.filesystem.list_directory import ListDirectoryTool
 
 
@@ -12,7 +12,7 @@ def test_list_directory_tool_metadata(workspace_boundary):
 def test_list_directory_tool_implements_base_tool(workspace_boundary):
     tool = ListDirectoryTool(workspace_boundary)
 
-    assert isinstance(tool, BaseTool)
+    assert isinstance(tool, SyncBaseTool)
 
 
 def test_list_directory_tool_execute(tmp_path,workspace_boundary):

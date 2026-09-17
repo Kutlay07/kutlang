@@ -1,6 +1,6 @@
 import pytest
 
-from harness.tools.base_tool import BaseTool
+from harness.tools.sync_base_tool import SyncBaseTool
 from harness.tools.filesystem.delete_file import DeleteFileTool
 
 
@@ -14,7 +14,7 @@ def test_delete_file_tool_metadata(workspace_boundary):
 def test_delete_file_tool_implements_base_tool(workspace_boundary):
     tool = DeleteFileTool(workspace_boundary)
 
-    assert isinstance(tool, BaseTool)
+    assert isinstance(tool, SyncBaseTool)
 
 
 def test_delete_file_tool_execute(tmp_path, workspace_boundary):

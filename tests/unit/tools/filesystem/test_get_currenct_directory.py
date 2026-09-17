@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from harness.tools.base_tool import BaseTool
+from harness.tools.sync_base_tool import SyncBaseTool
 from harness.tools.filesystem.get_current_directory import (
     GetCurrentDirectoryTool,
 )
@@ -16,7 +16,7 @@ def test_get_current_directory_tool_metadata():
 def test_get_current_directory_tool_implements_base_tool():
     tool = GetCurrentDirectoryTool()
 
-    assert isinstance(tool, BaseTool)
+    assert isinstance(tool, SyncBaseTool)
 
 
 def test_get_current_directory_tool_execute():

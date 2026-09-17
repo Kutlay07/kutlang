@@ -1,4 +1,4 @@
-from harness.tools.base_tool import BaseTool
+from harness.tools.sync_base_tool import SyncBaseTool
 from harness.tools.filesystem.file_exists import FileExistsTool
 
 
@@ -12,7 +12,7 @@ def test_file_exists_tool_metadata(workspace_boundary):
 def test_file_exists_tool_implements_base_tool(workspace_boundary):
     tool = FileExistsTool(workspace_boundary)
 
-    assert isinstance(tool, BaseTool)
+    assert isinstance(tool, SyncBaseTool)
 
 
 def test_file_exists_tool_returns_true_for_existing_file(tmp_path,workspace_boundary):
