@@ -1,4 +1,4 @@
-from .sync_base_tool import BaseTool
+from .base_tool import BaseTool
 from .tool_registration import ToolRegistration
 
 
