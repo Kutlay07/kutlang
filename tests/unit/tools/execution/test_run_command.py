@@ -55,6 +55,7 @@ async def test_run_command_returns_exit_code():
     assert "Exit code: 3" in result
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_run_command_handles_timeout():
     tool = RunCommandTool(ProcessTerminator())
@@ -79,6 +80,7 @@ async def test_run_command_handles_execution_error():
     assert "STDERR:" in result
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_run_command_times_out():
     tool = RunCommandTool(ProcessTerminator())
@@ -231,6 +233,7 @@ async def test_terminate_process_group_terminates_real_process():
         await process.wait()
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_process_tree_termination(tmp_path: Path):
     marker_path = tmp_path / "marker.txt"
@@ -354,6 +357,7 @@ async def test_cancellation_preserves_cancelled_error_when_cleanup_fails():
     terminate_process.assert_awaited_once_with(process)
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_real_cancellation():
     tool = RunCommandTool(ProcessTerminator())
@@ -372,6 +376,7 @@ async def test_real_cancellation():
         await task
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_real_cancellation_cleans_up_process_tree(tmp_path: Path):
     started_path = tmp_path / "started.txt"

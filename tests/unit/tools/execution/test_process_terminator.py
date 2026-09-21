@@ -52,6 +52,7 @@ async def test_terminate_stops_running_process():
         await process.wait()
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_termination_kills_process_group(tmp_path: Path):
     started_path = tmp_path / "started.txt"

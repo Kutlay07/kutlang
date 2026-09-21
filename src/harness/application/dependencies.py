@@ -11,7 +11,10 @@ from harness.policy.default_approval_broker import DefaultApprovalBroker
 from harness.policy.default_approval_handler import DefaultApprovalHandler
 from harness.policy.policy_engine import PolicyEngine
 from harness.policy.risk_classifier import RiskClassifier
+from harness.security.secret_file_visibility import SecretFileVisibility
 from harness.tools.entry_point_tool_discovery import EntryPointToolDiscovery
+from harness.tools.output_budget import OutputBudget
+from harness.tools.search.provider import SearchToolProvider
 from harness.tools.tool_registry import ToolRegistry
 from harness.security.workspace_path_guard import WorkspacePathGuard
 from harness.tools.filesystem.provider import FilesystemToolProvider
@@ -24,7 +27,10 @@ from harness.observability.audit_emitter import AuditEmitter
 from harness.observability.logging_audit_emitter import LoggingAuditEmitter
 from harness.observability.redaction.default_entropy_detector import DefaultEntropyDetector
 from harness.observability.redaction.default_secret_redactor import DefaultSecretRedactor
+from harness.tools.workspace_tool_provider import WorkspaceToolProvider
 
+
+SEARCH_OUTPUT_BUDGET_CHARS = 10_000
 
 def get_settings() -> Settings:
     return Settings()
@@ -40,27 +46,38 @@ def get_llm(settings: Settings = Depends(get_settings)) -> BaseLLM:
 def get_tool_registry(
     settings: Settings = Depends(get_settings),
     ) -> ToolRegistry:
-    
+
     boundary = WorkspacePathGuard(settings.workspace_root)
-    
+    search_visibility = SecretFileVisibility()
+    output_budget = OutputBudget(max_chars=SEARCH_OUTPUT_BUDGET_CHARS)
+
     discovery = EntryPointToolDiscovery()
     provider_classes = discovery.discover()
-    
+
     trusted_providers = {
         FilesystemToolProvider,
         ExecutionToolProvider,
+        SearchToolProvider,
     }
-    
+
     providers = []
-    
+
     for provider_class in provider_classes:
-        if issubclass(provider_class, FilesystemToolProvider):
+        if provider_class is SearchToolProvider:
+            providers.append(
+                provider_class(
+                    boundary, 
+                    search_visibility,
+                    output_budget,
+                    )
+            )
+        elif issubclass(provider_class, WorkspaceToolProvider):
             providers.append(provider_class(boundary))
         else:
             providers.append(provider_class())
             
     registrations = []
-    
+
     for provider in providers:
         if provider.__class__ in trusted_providers:
             trust_level = TrustLevel.TRUSTED
@@ -74,7 +91,7 @@ def get_tool_registry(
                     trust_level=trust_level,
                 )
             )
-    
+
     return ToolRegistry(registrations)
 
 

@@ -254,3 +254,6 @@ Thumbs.db
 models/
 
 .freebuff/
+.zcodeignore
+AGENTS.md
+PRODUCT_VISION.md
