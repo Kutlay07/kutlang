@@ -124,3 +124,10 @@ SENSITIVE_TARGET_PATTERNS = frozenset({
     "*.pem",
     "*.key",
 })
+
+
+#search
+SEARCH_TOOLS = frozenset({
+    "glob",
+    "grep"
+})
