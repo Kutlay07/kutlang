@@ -472,6 +472,35 @@ def test_grep_tool_limits_matches_without_truncating_context(
     assert "test.py:6:after third" not in result
 
 
+def test_grep_tool_truncates_extremely_long_lines(
+    tmp_path,
+    workspace_boundary,
+    search_visibility,
+):
+    long_line = "needle" + "x" * 50_000
+    file = tmp_path / "big.py"
+
+    file.write_text(
+        long_line + "\n"
+        "short needle here\n",
+        encoding="utf-8",
+    )
+
+    budget = OutputBudget(max_chars=400)
+    tool = GrepTool(
+        workspace_boundary,
+        search_visibility,
+        budget,
+    )
+
+    result = tool.execute(query="needle")
+
+    assert "big.py:1:" in result
+    assert "[line truncated]" in result
+    assert "short needle here" in result
+    assert long_line not in result
+
+
 def test_grep_tool_returns_empty_result_when_max_results_is_zero(
     tmp_path,
     workspace_boundary,

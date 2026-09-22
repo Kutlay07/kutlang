@@ -12,6 +12,9 @@ from harness.tools.output_budget import OutputBudget
 from ..sync_base_tool import SyncBaseTool
 
 
+MAX_LINE_CHARS = 250
+
+
 class GrepTool(SyncBaseTool):
 
     def __init__(
@@ -190,6 +193,9 @@ class GrepTool(SyncBaseTool):
                         continue
 
                 line = data["lines"]["text"].rstrip("\r\n")
+
+                if len(line) > MAX_LINE_CHARS:
+                    line = line[:MAX_LINE_CHARS] + " [line truncated]"
 
                 final_lines.append(
                     f"{path}:{line_number}:{line}"
