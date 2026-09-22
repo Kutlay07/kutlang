@@ -13,13 +13,13 @@ from ..sync_base_tool import SyncBaseTool
 
 
 class GrepTool(SyncBaseTool):
-    
+
     def __init__(
-        self, 
+        self,
         workspace_boundary: WorkspaceBoundary,
         search_visibility: SearchVisibility,
         output_budget: OutputBudget,
-        ):
+    ):
         self.workspace_boundary = workspace_boundary
         self.search_visibility = search_visibility
         self.output_budget = output_budget
@@ -43,26 +43,65 @@ class GrepTool(SyncBaseTool):
                 },
                 "pattern": {
                     "type": "string",
-                    "description": "File pattern to restrict the search ,relative to the workspace root. Defaults to '**/*' to search all files."
-                }
+                    "description": "File pattern to restrict the search, relative to the workspace root. Defaults to '**/*' to search all files.",
+                },
+                "before": {
+                    "type": "integer",
+                    "description": "The number of lines of context to include BEFORE each match.",
+                    "minimum": 0,
+                },
+                "after": {
+                    "type": "integer",
+                    "description": "The number of lines of context to include AFTER each match.",
+                    "minimum": 0,
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "The number of matches the tool will return.",
+                    "minimum": 0,
+                },
             },
             "required": ["query"],
             "additionalProperties": False,
         }
 
+    def execute(
+        self,
+        query: str,
+        pattern: str = "**/*",
+        before: int = 0,
+        after: int = 0,
+        max_results: int | None = None,
+    ) -> str:
 
-    def execute(self, query: str, pattern: str = "**/*") -> str:
-        if Path(pattern).is_absolute() or ".." in Path(pattern).parts:
-            raise WorkspaceBoundaryViolation(f"Outside boundary: {pattern}")
+        if before < 0:
+            raise ValueError("before must be >= 0")
+
+        if after < 0:
+            raise ValueError("after must be >= 0")
+
+        if max_results is not None and max_results < 0:
+            raise ValueError("max_results must be >= 0")
+
+        if max_results == 0:
+            return ""
+
+        pattern_path = Path(pattern)
+
+        if pattern_path.is_absolute() or ".." in pattern_path.parts:
+            raise WorkspaceBoundaryViolation(
+                f"Outside boundary: {pattern}"
+            )
 
         workspace_root = self.workspace_boundary.root
 
         command = [
             "rg",
             "--json",
+            "-B", str(before),
+            "-A", str(after),
             "-g", pattern,
-            "-e",
-            query,
+            "-e", query,
         ]
 
         try:
@@ -74,36 +113,92 @@ class GrepTool(SyncBaseTool):
                 check=False,
                 cwd=workspace_root,
             )
-            
+
             if process.returncode == 1:
                 return ""
+
             if process.returncode == 2:
                 raise RuntimeError(process.stderr.strip())
+
             if not process.stdout:
                 return ""
+            
+            events = [
+                json.loads(line)
+                for line in process.stdout.splitlines()
+            ]
 
-            final_lines = []
-            for line in process.stdout.splitlines():
-                event = json.loads(line)
+            selected_matches = []
 
+            for event in events:
                 if event["type"] != "match":
                     continue
 
-                data = event["data"]
+                selected_matches.append(event)
 
+                if (
+                    max_results is not None
+                    and len(selected_matches) >= max_results
+                ):
+                    break
+
+            selected_match_positions = {
+                (
+                    event["data"]["path"]["text"],
+                    event["data"]["line_number"],
+                )
+                for event in selected_matches
+            }
+
+            selected_ranges = {}
+
+            for event in selected_matches:
+                data = event["data"]
+                path = data["path"]["text"]
+                line_number = data["line_number"]
+
+                start = max(1, line_number - before)
+                end = line_number + after
+
+                selected_ranges.setdefault(path, []).append((start, end))
+
+            final_lines = []
+
+            for event in events:
+                if event["type"] not in {"match", "context"}:
+                    continue
+
+                data = event["data"]
                 path = Path(data["path"]["text"])
 
                 if not self.search_visibility.is_visible(path):
                     continue
 
                 line_number = data["line_number"]
-                line = data["lines"]["text"].rstrip("\r\n")
-                
+                path_key = data["path"]["text"]
 
-                final_lines.append(f"{path}:{line_number}:{line}")
+                if event["type"] == "match":
+                    if (path_key, line_number) not in selected_match_positions:
+                        continue
+                else:
+                    ranges = selected_ranges.get(path_key, [])
+
+                    if not any(
+                        start <= line_number <= end
+                        for start, end in ranges
+                    ):
+                        continue
+
+                line = data["lines"]["text"].rstrip("\r\n")
+
+                final_lines.append(
+                    f"{path}:{line_number}:{line}"
+                )
 
             lines = self.output_budget.enforce(final_lines)
             return "\n".join(lines)
 
         except FileNotFoundError:
-            raise RuntimeError("ripgrep (rg) binary is not installed on the system.")
+            raise RuntimeError(
+                "ripgrep (rg) binary is not installed on the system"
+            )
