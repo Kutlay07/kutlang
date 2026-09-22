@@ -471,3 +471,29 @@ def test_process_commands_are_not_case_sensitive():
     assert request1_risk == RiskLevel.CRITICAL
     assert request2_risk == RiskLevel.CRITICAL
     assert request3_risk == RiskLevel.CRITICAL
+
+
+def test_grep_is_classified_as_low_risk():
+    classifier = DefaultRiskClassifier()
+    
+    request = ToolExecutionRequest(
+        tool_name="grep",
+        arguments=ToolArguments({}),
+    )
+    
+    request_risk = classifier.classify(request)
+    
+    assert request_risk == RiskLevel.LOW
+
+
+def test_glob_is_classified_as_low_risk():
+    classifier = DefaultRiskClassifier()
+    
+    request = ToolExecutionRequest(
+        tool_name="glob",
+        arguments=ToolArguments({}),
+    )
+    
+    request_risk = classifier.classify(request)
+    
+    assert request_risk == RiskLevel.LOW
