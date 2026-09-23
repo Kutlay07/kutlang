@@ -192,6 +192,10 @@ class GrepTool(SyncBaseTool):
             if event["type"] != "match":
                 continue
             
+            path = Path(event["data"]["path"]["text"])
+            if not self.search_visibility.is_visible(path):
+                continue
+
             selected_matches.append(event)
             
             if (
