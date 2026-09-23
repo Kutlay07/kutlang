@@ -93,7 +93,7 @@ class GrepTool(SyncBaseTool):
         events = self._parse_events(stdout)
         selected_matches = self._select_matches(events, max_results)
         context_ranges = self._build_context_ranges(selected_matches, before, after)
-        lines = self._collect_output_lines(events, selected_matches, context_ranges)
+        lines = self._collect_output_lines(events, context_ranges)
 
         return "\n".join(self.output_budget.enforce(lines))
 
@@ -156,6 +156,10 @@ class GrepTool(SyncBaseTool):
             "-A", str(after),
             "-g", pattern,
             "-e", query,
+            # Explicit search path: without it, rg's behavior depends on
+            # stdin (reads stdin when it is a pipe, searches the directory
+            # only when stdin is a TTY). "." makes the search deterministic.
+            ".",
         ]
 
 
@@ -163,10 +167,31 @@ class GrepTool(SyncBaseTool):
         self,
         stdout,
     ) -> list:
-        return [
+        events = [
             json.loads(line)
             for line in stdout.splitlines()
         ]
+
+        # rg reports paths relative to the explicit search path
+        # (e.g. "./t.py" on Linux, ".\\t.py" on Windows); strip the
+        # prefix to keep output workspace-relative.
+        for event in events:
+            data = event.get("data")
+
+            if data is None or "path" not in data:
+                continue
+
+            path_text = data["path"]["text"]
+            data["path"]["text"] = self._strip_search_prefix(path_text)
+
+        return events
+
+
+    def _strip_search_prefix(self, path_text: str) -> str:
+        if path_text.startswith("./") or path_text.startswith(".\\"):
+            return path_text[2:]
+
+        return path_text
 
 
     def _validate_pattern(
@@ -187,18 +212,24 @@ class GrepTool(SyncBaseTool):
         max_results: int | None,
     ) -> list:
         selected_matches = []
-        
+
         for event in events:
             if event["type"] != "match":
                 continue
-            
+
+            path = Path(event["data"]["path"]["text"])
+
+            if not self.search_visibility.is_visible(path):
+                continue
+
             selected_matches.append(event)
-            
+
             if (
                 max_results is not None
                 and len(selected_matches) >= max_results
             ):
                 break
+
         return selected_matches
 
 
@@ -226,17 +257,8 @@ class GrepTool(SyncBaseTool):
     def _collect_output_lines(
         self,
         events: list,
-        selected_matches: list,
         context_ranges: dict,
         ) -> list[str]:
-        selected_match_positions = {
-            (
-                event["data"]["path"]["text"],
-                event["data"]["line_number"],
-            )
-            for event in selected_matches
-        }
-
         final_lines = []
 
         for event in events:
@@ -249,20 +271,16 @@ class GrepTool(SyncBaseTool):
             if not self.search_visibility.is_visible(path):
                 continue
 
-            line_number = data["line_number"]
             path_key = data["path"]["text"]
+            line_number = data["line_number"]
 
-            if event["type"] == "match":
-                if (path_key, line_number) not in selected_match_positions:
-                    continue
-            else:
-                ranges = context_ranges.get(path_key, [])
+            ranges = context_ranges.get(path_key, [])
 
-                if not any(
-                    start <= line_number <= end
-                    for start, end in ranges
-                ):
-                    continue
+            if not any(
+                start <= line_number <= end
+                for start, end in ranges
+            ):
+                continue
 
             line = data["lines"]["text"].rstrip("\r\n")
 

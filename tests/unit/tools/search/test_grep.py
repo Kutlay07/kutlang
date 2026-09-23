@@ -522,3 +522,16 @@ def test_grep_tool_returns_empty_result_when_max_results_is_zero(
     )
 
     assert result == ""
+
+
+def test_select_matches_ignores_hidden_files_when_counting_max_results(
+    workspace_boundary, search_visibility, output_budget,
+):
+    tool = GrepTool(workspace_boundary, search_visibility, output_budget)
+
+    hidden = {"type": "match", "data": {"path": {"text": ".env"}, "line_number": 1, "lines": {"text": "needle\n"}}}
+    visible = {"type": "match", "data": {"path": {"text": "main.py"}, "line_number": 1, "lines": {"text": "needle\n"}}}
+
+    selected = tool._select_matches([hidden, visible], max_results=1)
+
+    assert selected == [visible]
