@@ -47,6 +47,20 @@ def test_grep_tool_parameters(
     }
 
 
+# Policy lock: grep intentionally respects .gitignore and skips hidden files (see issue #28)
+def test_build_command_keeps_gitignore_and_hidden_file_defaults(
+    workspace_boundary, search_visibility, output_budget,
+):
+    tool = GrepTool(
+        workspace_boundary, search_visibility, output_budget,
+    )
+    
+    command = tool._build_command("query", "**/*", 0, 0)
+    
+    assert "--hidden" not in command
+    assert "--no-ignore" not in command
+
+
 def test_grep_tool_finds_text_matches(
     tmp_path, 
     workspace_boundary,
