@@ -33,7 +33,12 @@ class GrepTool(SyncBaseTool):
 
     @property
     def description(self) -> str:
-        return "Search for specific text content or patterns inside files within the workspace."
+        return (
+            "Search for specific text content or patterns inside files within "
+            "the workspace. Respects .gitignore rules and skips hidden files "
+            "and directories; sensitive file names (e.g. .env, *.pem) are "
+            "filtered from the results."
+        )
 
     @property
     def parameters(self) -> dict:
@@ -46,7 +51,7 @@ class GrepTool(SyncBaseTool):
                 },
                 "pattern": {
                     "type": "string",
-                    "description": "File pattern to restrict the search, relative to the workspace root. Defaults to '**/*' to search all files.",
+                    "description": "File pattern to restrict the search, relative to the workspace root. Defaults to '**/*' to search all non-hidden, non-gitignored files.",
                 },
                 "before": {
                     "type": "integer",
