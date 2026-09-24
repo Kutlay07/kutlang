@@ -153,15 +153,14 @@ class GrepTool(SyncBaseTool):
     def _run_ripgrep(
         self,
         command: list[str],
-        workspace_root: Path
-    ) -> list[str]:
+        workspace_root: Path,
+    ) -> Iterator[str]:
         try:
-            process = subprocess.run(
+            process = subprocess.Popen(
                 command,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                check=False,
                 cwd=workspace_root,
             )
         except FileNotFoundError:
@@ -169,13 +168,25 @@ class GrepTool(SyncBaseTool):
                 "ripgrep (rg) binary is not installed on the system"
             )
 
-        if process.returncode == 1:
-            return ""
+        def stream() -> Iterator[str]:
+            try:
+                for line in process.stdout:
+                    yield line
 
-        if process.returncode == 2:
-            raise RuntimeError(process.stderr.strip())
+                # Natural end: rg finished on its own. Enforce the
+                # returncode contract (1 = no matches, 2 = bad usage).
+                stderr_text = process.stderr.read()
+                returncode = process.wait()
 
-        return process.stdout.splitlines()
+                if returncode == 2:
+                    raise RuntimeError(stderr_text.strip())
+            finally:
+                # Reached on natural end OR on early close (break/GeneratorExit).
+                if process.poll() is None:      # process still alive?
+                    process.kill()
+                process.wait()                  # reap it in every case
+
+        return stream()
 
 
     def _build_command(

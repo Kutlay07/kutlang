@@ -571,3 +571,36 @@ def test_grep_stops_reading_stream_after_result_budget(
 
     assert len(lines_read) < 50
     assert "needle" in result
+
+
+def test_run_ripgrep_returns_lazy_line_stream(
+    tmp_path,
+    workspace_boundary,
+    search_visibility,
+    output_budget,
+):
+    huge_file = tmp_path / "test.py"
+    huge_file.write_text(
+        "needle here\n" + "\n".join(["hello" for _ in range(100_000)])
+    )
+
+    tool = GrepTool(
+        workspace_boundary,
+        search_visibility,
+        output_budget,
+    )
+
+    command = tool._build_command("needle", "**/*", 0, 0)
+
+    stream = tool._run_ripgrep(command, tmp_path)
+
+    match_line = None
+    for _ in range(10):
+        line = next(stream)
+        if "needle" in line:
+            match_line = line
+            break
+
+    assert match_line is not None
+    assert iter(stream) is stream
+    assert "needle" in match_line
