@@ -24,8 +24,7 @@ def test_grep_tool_parameters(
                 "description": "The text string or regex pattern to search for inside the files (e.g., 'def execute', 'TODO').",
             },
             "pattern": {
-                "type": "string",
-                "description": "File pattern to restrict the search, relative to the workspace root. Defaults to '**/*' to search all files.",
+                "type": "string",                    "description": "File pattern to restrict the search, relative to the workspace root. Defaults to '**/*' to search all non-hidden, non-gitignored files.",
             },
             "before": {
                 "type": "integer",
