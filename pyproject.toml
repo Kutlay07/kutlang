@@ -19,6 +19,7 @@ dependencies = [
 [project.entry-points."harness.tools"]
 filesystem = "harness.tools.filesystem.provider:FilesystemToolProvider"
 execution = "harness.tools.execution.provider:ExecutionToolProvider"
+search = "harness.tools.search.provider:SearchToolProvider"
 
 
 [project.optional-dependencies]

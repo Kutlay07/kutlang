@@ -1,0 +1,299 @@
+import json
+import subprocess
+from pathlib import Path
+
+from harness.security.search_visibility import SearchVisibility
+from harness.security.workspace_boundary import (
+    WorkspaceBoundary,
+    WorkspaceBoundaryViolation,
+)
+from harness.tools.output_budget import OutputBudget
+
+from ..sync_base_tool import SyncBaseTool
+
+
+MAX_LINE_CHARS = 250
+
+
+class GrepTool(SyncBaseTool):
+
+    def __init__(
+        self,
+        workspace_boundary: WorkspaceBoundary,
+        search_visibility: SearchVisibility,
+        output_budget: OutputBudget,
+    ):
+        self.workspace_boundary = workspace_boundary
+        self.search_visibility = search_visibility
+        self.output_budget = output_budget
+
+    @property
+    def name(self) -> str:
+        return "grep"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Search for specific text content or patterns inside files within "
+            "the workspace. Respects .gitignore rules and skips hidden files "
+            "and directories; sensitive file names (e.g. .env, *.pem) are "
+            "filtered from the results."
+        )
+
+    @property
+    def parameters(self) -> dict:
+        return {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The text string or regex pattern to search for inside the files (e.g., 'def execute', 'TODO').",
+                },
+                "pattern": {
+                    "type": "string",
+                    "description": "File pattern to restrict the search, relative to the workspace root. Defaults to '**/*' to search all non-hidden, non-gitignored files.",
+                },
+                "before": {
+                    "type": "integer",
+                    "description": "The number of lines of context to include BEFORE each match.",
+                    "minimum": 0,
+                },
+                "after": {
+                    "type": "integer",
+                    "description": "The number of lines of context to include AFTER each match.",
+                    "minimum": 0,
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "The number of matches the tool will return.",
+                    "minimum": 0,
+                },
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        }
+
+    def execute(
+        self,
+        query: str,
+        pattern: str = "**/*",
+        before: int = 0,
+        after: int = 0,
+        max_results: int | None = None,
+    ) -> str:
+        self._validate_arguments(before, after, max_results)
+
+        if max_results == 0:
+            return ""
+
+        self._validate_pattern(pattern)
+
+        workspace_root = self.workspace_boundary.root
+        command = self._build_command(query, pattern, before, after)
+        stdout = self._run_ripgrep(command, workspace_root)
+
+        if not stdout:
+            return ""
+
+        events = self._parse_events(stdout)
+        selected_matches = self._select_matches(events, max_results)
+        context_ranges = self._build_context_ranges(selected_matches, before, after)
+        lines = self._collect_output_lines(events, context_ranges)
+
+        return "\n".join(self.output_budget.enforce(lines))
+
+
+    def _validate_arguments(
+        self,
+        before,
+        after,
+        max_results,
+        ):
+        if before < 0:
+            raise ValueError("before must be >= 0")
+
+        if after < 0:
+            raise ValueError("after must be >= 0")
+
+        if max_results is not None and max_results < 0:
+            raise ValueError("max_results must be >= 0")
+
+
+    def _run_ripgrep(
+        self,
+        command: list[str],
+        workspace_root: Path
+    ) -> str:
+        try:
+            process = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False,
+                cwd=workspace_root,
+            )
+        except FileNotFoundError:
+            raise RuntimeError(
+                "ripgrep (rg) binary is not installed on the system"
+            )
+
+        if process.returncode == 1:
+            return ""
+
+        if process.returncode == 2:
+            raise RuntimeError(process.stderr.strip())
+
+        return process.stdout
+
+
+    def _build_command(
+        self,
+        query: str,
+        pattern: str,
+        before: int,
+        after: int,
+        ) -> list[str]:
+        return [
+            "rg",
+            "--json",
+            "-B", str(before),
+            "-A", str(after),
+            "-g", pattern,
+            "-e", query,
+            # Explicit search path: without it, rg's behavior depends on
+            # stdin (reads stdin when it is a pipe, searches the directory
+            # only when stdin is a TTY). "." makes the search deterministic.
+            ".",
+        ]
+
+
+    def _parse_events(
+        self,
+        stdout,
+    ) -> list:
+        events = [
+            json.loads(line)
+            for line in stdout.splitlines()
+        ]
+
+        # rg reports paths relative to the explicit search path
+        # (e.g. "./t.py" on Linux, ".\\t.py" on Windows); strip the
+        # prefix to keep output workspace-relative.
+        for event in events:
+            data = event.get("data")
+
+            if data is None or "path" not in data:
+                continue
+
+            path_text = data["path"]["text"]
+            data["path"]["text"] = self._strip_search_prefix(path_text)
+
+        return events
+
+
+    def _strip_search_prefix(self, path_text: str) -> str:
+        if path_text.startswith("./") or path_text.startswith(".\\"):
+            return path_text[2:]
+
+        return path_text
+
+
+    def _validate_pattern(
+        self,
+        pattern: str
+    ) -> None:
+        pattern_path = Path(pattern)
+        
+        if pattern_path.is_absolute() or ".." in pattern_path.parts:
+            raise WorkspaceBoundaryViolation(
+                f"Outside boundary: {pattern}"
+            )
+
+
+    def _select_matches(
+        self,
+        events,
+        max_results: int | None,
+    ) -> list:
+        selected_matches = []
+
+        for event in events:
+            if event["type"] != "match":
+                continue
+
+            path = Path(event["data"]["path"]["text"])
+
+            if not self.search_visibility.is_visible(path):
+                continue
+
+            selected_matches.append(event)
+
+            if (
+                max_results is not None
+                and len(selected_matches) >= max_results
+            ):
+                break
+
+        return selected_matches
+
+
+    def _build_context_ranges(
+        self,
+        selected_matches: list,
+        before: int,
+        after: int,
+        ) -> dict:
+        selected_ranges = {}
+
+        for event in selected_matches:
+            data = event["data"]
+            path = data["path"]["text"]
+            line_number = data["line_number"]
+
+            start = max(1, line_number - before)
+            end = line_number + after
+
+            selected_ranges.setdefault(path, []).append((start, end))
+
+        return selected_ranges
+
+
+    def _collect_output_lines(
+        self,
+        events: list,
+        context_ranges: dict,
+        ) -> list[str]:
+        final_lines = []
+
+        for event in events:
+            if event["type"] not in {"match", "context"}:
+                continue
+
+            data = event["data"]
+            path = Path(data["path"]["text"])
+
+            if not self.search_visibility.is_visible(path):
+                continue
+
+            path_key = data["path"]["text"]
+            line_number = data["line_number"]
+
+            ranges = context_ranges.get(path_key, [])
+
+            if not any(
+                start <= line_number <= end
+                for start, end in ranges
+            ):
+                continue
+
+            line = data["lines"]["text"].rstrip("\r\n")
+
+            if len(line) > MAX_LINE_CHARS:
+                line = line[:MAX_LINE_CHARS] + " [line truncated]"
+
+            final_lines.append(
+                f"{path}:{line_number}:{line}"
+            )
+
+        return final_lines

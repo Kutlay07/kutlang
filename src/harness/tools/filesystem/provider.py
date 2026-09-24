@@ -14,14 +14,10 @@ from harness.tools.filesystem.list_directory import ListDirectoryTool
 from harness.tools.filesystem.move_file import MoveFileTool
 from harness.tools.filesystem.read_file import ReadFileTool
 from harness.tools.filesystem.write_file import WriteFileTool
-from harness.tools.tool_provider import ToolProvider
+from harness.tools.workspace_tool_provider import WorkspaceToolProvider
 
 
-class FilesystemToolProvider(ToolProvider):
-    
-    def __init__(self, workspace_boundary: WorkspaceBoundary):
-        self.workspace_boundary = workspace_boundary
-    
+class FilesystemToolProvider(WorkspaceToolProvider):
     def get_tools(self) -> list[BaseTool]:
         return [
             AppendFileTool(self.workspace_boundary),

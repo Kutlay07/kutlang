@@ -121,4 +121,13 @@ HIGH_GIT_COMMANDS = frozenset({
 # sensitive
 SENSITIVE_TARGET_PATTERNS = frozenset({
     ".env*",
+    "*.pem",
+    "*.key",
+})
+
+
+#search
+SEARCH_TOOLS = frozenset({
+    "glob",
+    "grep"
 })

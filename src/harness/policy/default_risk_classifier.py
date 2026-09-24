@@ -8,6 +8,7 @@ from harness.policy.tool_execution_request import ToolExecutionRequest
 from harness.policy.risk_patterns import (
     FILESYSTEM_TOOLS,
     READ_ONLY_FILESYSTEM_TOOLS,
+    SEARCH_TOOLS,
     WRITE_FILESYSTEM_TOOLS,
     DESTRUCTIVE_FILESYSTEM_TOOLS,
     EXECUTION_TOOLS,
@@ -35,6 +36,9 @@ class DefaultRiskClassifier(RiskClassifier):
             
         if tool_name in EXECUTION_TOOLS:
             risks.append(self._classify_execution(request))
+            
+        if tool_name in SEARCH_TOOLS:
+            risks.append(self._classify_search(request))
             
         sensitive_risk = self._classify_sensitive_target(request)
         
@@ -149,3 +153,15 @@ class DefaultRiskClassifier(RiskClassifier):
             return RiskLevel.HIGH
         except ValueError:
             return RiskLevel.HIGH
+
+
+    def _classify_search(
+        self,
+        request: ToolExecutionRequest,
+    ) -> RiskLevel | None:
+    
+        tool_name = request.tool_name
+        
+        if tool_name in SEARCH_TOOLS:
+            return RiskLevel.LOW
+        return None

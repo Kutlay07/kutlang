@@ -4,10 +4,16 @@ from harness.security.workspace_boundary import WorkspaceBoundaryViolation
 
 
 class WorkspacePathGuard:
-    
+
     def __init__(self, workspace_root: Path):
         self.workspace_root = workspace_root.resolve()
-        
+
+
+    @property
+    def root(self) -> Path:
+        return self.workspace_root
+
+
     def validate(self, path: str) -> Path:
         resolved = (self.workspace_root / path).resolve()
         
