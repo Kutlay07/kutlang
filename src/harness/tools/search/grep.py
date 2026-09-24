@@ -1,6 +1,8 @@
+from collections import deque
 import json
 import subprocess
 from pathlib import Path
+from typing import Iterator
 
 from harness.security.search_visibility import SearchVisibility
 from harness.security.workspace_boundary import (
@@ -87,18 +89,50 @@ class GrepTool(SyncBaseTool):
             return ""
 
         self._validate_pattern(pattern)
-
         workspace_root = self.workspace_boundary.root
         command = self._build_command(query, pattern, before, after)
         stdout = self._run_ripgrep(command, workspace_root)
 
-        if not stdout:
-            return ""
+        remaining = max_results
+        pending_after = 0
+        recent = deque(maxlen=before)
+        lines = []
 
-        events = self._parse_events(stdout)
-        selected_matches = self._select_matches(events, max_results)
-        context_ranges = self._build_context_ranges(selected_matches, before, after)
-        lines = self._collect_output_lines(events, context_ranges)
+        for event in self._parse_events(stdout):
+            event_type = event["type"]
+            
+            if event_type not in {"match", "context"}:
+                continue
+
+            data = event["data"]
+            path = Path(data["path"]["text"])
+
+            if not self.search_visibility.is_visible(path):
+                continue
+
+            if event_type == "match":
+                if pending_after > 0:
+                    lines.append(self._format_line(data))
+                    pending_after -= 1
+                elif remaining is None or remaining > 0:
+                    lines.extend(recent)
+                    recent.clear()
+                    lines.append(self._format_line(data))
+
+                    if remaining is not None:
+                        remaining -= 1
+                    
+                    pending_after = after
+
+            else:
+                if pending_after > 0:
+                    lines.append(self._format_line(data))
+                    pending_after -= 1
+                else:
+                    recent.append(self._format_line(data))
+
+            if remaining == 0 and pending_after == 0:
+                break
 
         return "\n".join(self.output_budget.enforce(lines))
 
@@ -122,15 +156,14 @@ class GrepTool(SyncBaseTool):
     def _run_ripgrep(
         self,
         command: list[str],
-        workspace_root: Path
-    ) -> str:
+        workspace_root: Path,
+    ) -> Iterator[str]:
         try:
-            process = subprocess.run(
+            process = subprocess.Popen(
                 command,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                check=False,
                 cwd=workspace_root,
             )
         except FileNotFoundError:
@@ -138,13 +171,25 @@ class GrepTool(SyncBaseTool):
                 "ripgrep (rg) binary is not installed on the system"
             )
 
-        if process.returncode == 1:
-            return ""
+        def stream() -> Iterator[str]:
+            try:
+                for line in process.stdout:
+                    yield line
 
-        if process.returncode == 2:
-            raise RuntimeError(process.stderr.strip())
+                # Natural end: rg finished on its own. Enforce the
+                # returncode contract (1 = no matches, 2 = bad usage).
+                stderr_text = process.stderr.read()
+                returncode = process.wait()
 
-        return process.stdout
+                if returncode == 2:
+                    raise RuntimeError(stderr_text.strip())
+            finally:
+                # Reached on natural end OR on early close (break/GeneratorExit).
+                if process.poll() is None:      # process still alive?
+                    process.kill()
+                process.wait()                  # reap it in every case
+
+        return stream()
 
 
     def _build_command(
@@ -171,25 +216,19 @@ class GrepTool(SyncBaseTool):
     def _parse_events(
         self,
         stdout,
-    ) -> list:
-        events = [
-            json.loads(line)
-            for line in stdout.splitlines()
-        ]
-
-        # rg reports paths relative to the explicit search path
-        # (e.g. "./t.py" on Linux, ".\\t.py" on Windows); strip the
-        # prefix to keep output workspace-relative.
-        for event in events:
+    ) -> Iterator:
+        
+        for line in stdout:
+            event = json.loads(line)
+            
             data = event.get("data")
-
             if data is None or "path" not in data:
                 continue
 
             path_text = data["path"]["text"]
             data["path"]["text"] = self._strip_search_prefix(path_text)
 
-        return events
+            yield event
 
 
     def _strip_search_prefix(self, path_text: str) -> str:
@@ -211,89 +250,12 @@ class GrepTool(SyncBaseTool):
             )
 
 
-    def _select_matches(
-        self,
-        events,
-        max_results: int | None,
-    ) -> list:
-        selected_matches = []
+    def _format_line(self, data) -> str:
+        path = data["path"]["text"]
+        line_number = data["line_number"]
+        line = data["lines"]["text"].rstrip("\r\n")
+        
+        if len(line) > MAX_LINE_CHARS:
+            line = line[:MAX_LINE_CHARS] + " [line truncated]"
 
-        for event in events:
-            if event["type"] != "match":
-                continue
-
-            path = Path(event["data"]["path"]["text"])
-
-            if not self.search_visibility.is_visible(path):
-                continue
-
-            selected_matches.append(event)
-
-            if (
-                max_results is not None
-                and len(selected_matches) >= max_results
-            ):
-                break
-
-        return selected_matches
-
-
-    def _build_context_ranges(
-        self,
-        selected_matches: list,
-        before: int,
-        after: int,
-        ) -> dict:
-        selected_ranges = {}
-
-        for event in selected_matches:
-            data = event["data"]
-            path = data["path"]["text"]
-            line_number = data["line_number"]
-
-            start = max(1, line_number - before)
-            end = line_number + after
-
-            selected_ranges.setdefault(path, []).append((start, end))
-
-        return selected_ranges
-
-
-    def _collect_output_lines(
-        self,
-        events: list,
-        context_ranges: dict,
-        ) -> list[str]:
-        final_lines = []
-
-        for event in events:
-            if event["type"] not in {"match", "context"}:
-                continue
-
-            data = event["data"]
-            path = Path(data["path"]["text"])
-
-            if not self.search_visibility.is_visible(path):
-                continue
-
-            path_key = data["path"]["text"]
-            line_number = data["line_number"]
-
-            ranges = context_ranges.get(path_key, [])
-
-            if not any(
-                start <= line_number <= end
-                for start, end in ranges
-            ):
-                continue
-
-            line = data["lines"]["text"].rstrip("\r\n")
-
-            if len(line) > MAX_LINE_CHARS:
-                line = line[:MAX_LINE_CHARS] + " [line truncated]"
-
-            final_lines.append(
-                f"{path}:{line_number}:{line}"
-            )
-
-        return final_lines
+        return f"{path}:{line_number}:{line}"
