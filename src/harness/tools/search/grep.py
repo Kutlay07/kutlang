@@ -111,14 +111,17 @@ class GrepTool(SyncBaseTool):
                 continue
 
             if event_type == "match":
-                if remaining is None or remaining > 0:
+                if pending_after > 0:
+                    lines.append(self._format_line(data))
+                    pending_after -= 1
+                elif remaining is None or remaining > 0:
                     lines.extend(recent)
                     recent.clear()
                     lines.append(self._format_line(data))
 
                     if remaining is not None:
                         remaining -= 1
-
+                    
                     pending_after = after
 
             else:

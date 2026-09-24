@@ -604,3 +604,28 @@ def test_run_ripgrep_returns_lazy_line_stream(
     assert match_line is not None
     assert iter(stream) is stream
     assert "needle" in match_line
+
+
+def test_grep_includes_adjacent_match_in_trailing_after_context(
+    tmp_path,
+    workspace_boundary,
+    search_visibility,
+    output_budget,
+):
+    file = tmp_path / "test.py"
+    file.write_text("needle\nneedle",  encoding="utf-8")
+
+    tool = GrepTool(
+        workspace_boundary,
+        search_visibility,
+        output_budget,
+    )
+
+    result = tool.execute(
+        query="needle",
+        max_results=1,
+        after=1,
+        )
+
+    assert "test.py:1:needle" in result.splitlines()
+    assert "test.py:2:needle" in result.splitlines()
