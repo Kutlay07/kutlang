@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from harness.security.workspace_boundary import WorkspaceBoundaryViolation
@@ -537,14 +539,35 @@ def test_grep_tool_returns_empty_result_when_max_results_is_zero(
     assert result == ""
 
 
-def test_select_matches_ignores_hidden_files_when_counting_max_results(
+def _match_event(path, line_number, text):
+    return json.dumps({
+        "type": "match",
+        "data": {
+            "path": {"text": path},
+            "line_number": line_number,
+            "lines": {"text": text},
+        },
+    })
+def _filler_event():
+    return json.dumps({"type": "something-else"})
+
+def test_grep_stops_reading_stream_after_result_budget(
     workspace_boundary, search_visibility, output_budget,
 ):
-    tool = GrepTool(workspace_boundary, search_visibility, output_budget)
+    tool = GrepTool(
+        workspace_boundary, search_visibility, output_budget
+    )
+    lines_read = []
 
-    hidden = {"type": "match", "data": {"path": {"text": ".env"}, "line_number": 1, "lines": {"text": "needle\n"}}}
-    visible = {"type": "match", "data": {"path": {"text": "main.py"}, "line_number": 1, "lines": {"text": "needle\n"}}}
+    def fake_run_ripgrep(command, workspace_root):
+        yield _match_event("visible.py", 1, "needle here")
+        for _ in range(9_999):
+            lines_read.append(1)
+            yield _filler_event()
 
-    selected = tool._select_matches([hidden, visible], max_results=1)
+    tool._run_ripgrep = fake_run_ripgrep
 
-    assert selected == [visible]
+    result = tool.execute(query="needle", max_results=1)
+
+    assert len(lines_read) < 50
+    assert "needle" in result
