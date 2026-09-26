@@ -3,6 +3,8 @@ from fastapi import Depends
 
 from harness.agent.agent_runtime import AgentRuntime
 from harness.config.settings import Settings
+from harness.context.context_assembler import ContextAssembler
+from harness.context.priority_order_assembler import PriorityOrderAssembler
 from harness.llm.base_llm import BaseLLM
 from harness.llm.local import LocalLLM
 from harness.policy.approval_broker import ApprovalBroker
@@ -137,6 +139,9 @@ def get_audit_emitter(
         logger=logger,
         secret_redactor=secret_redactor,
     )
+
+def get_context_assembler() -> ContextAssembler:
+    return PriorityOrderAssembler()
 
 
 def get_agent_runtime(
