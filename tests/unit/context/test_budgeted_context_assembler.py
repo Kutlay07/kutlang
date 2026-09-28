@@ -61,3 +61,28 @@ def test_assembler_returns_empty_list_when_single_section_exceeds_budget():
     result = assembler.assemble(sections)
 
     assert result == []
+
+
+def test_assembler_emits_telemetry_record_when_emitter_present():
+    emitted = []
+    
+    class FakeTelemetry:
+        def record(self, event: dict) -> None:
+            emitted.append(event)
+
+    assembler = BudgetedContextAssembler(max_tokens=800, telemetry=FakeTelemetry())
+
+    sections = [
+        FakeSection(kind="system", content="big", priority=10, estimated_tokens=500),
+        FakeSection(kind="task", content="small", priority=20, estimated_tokens=400),
+    ]
+
+    assembler.assemble(sections)
+
+    assert len(emitted) == 1
+    event = emitted[0]
+    assert event["sections_in"] == 2
+    assert event["sections_kept"] == 1
+    assert event["tokens_kept"] == 500
+    assert event["tokens_dropped"] == 400
+    assert event["dropped_kinds"] == ["task"]   # düşen section'ın kind'ı

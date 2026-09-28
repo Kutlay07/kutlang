@@ -5,7 +5,8 @@ from harness.agent.agent_runtime import AgentRuntime
 from harness.config.settings import Settings
 from harness.context.budgeted_context_assembler import BudgetedContextAssembler
 from harness.context.context_assembler import ContextAssembler
-from harness.context.priority_order_assembler import PriorityOrderAssembler
+from harness.context.context_telemetry import ContextTelemetry
+from harness.context.logging_context_telemetry import LoggingContextTelemetry
 from harness.llm.base_llm import BaseLLM
 from harness.llm.local import LocalLLM
 from harness.policy.approval_broker import ApprovalBroker
@@ -141,11 +142,21 @@ def get_audit_emitter(
         secret_redactor=secret_redactor,
     )
 
+
+def get_context_telemetry() -> ContextTelemetry:
+    return LoggingContextTelemetry(
+        logger=logging.getLogger("harness.context")
+    )
+
+
+
 def get_context_assembler(
     settings: Settings = Depends(get_settings),
+    telemetry: ContextTelemetry = Depends(get_context_telemetry),
     ) -> ContextAssembler:
     return BudgetedContextAssembler(
-        max_tokens=settings.max_context_tokens
+        max_tokens=settings.max_context_tokens,
+        telemetry=telemetry,
         )
 
 
