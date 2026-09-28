@@ -3,6 +3,7 @@ from fastapi import Depends
 
 from harness.agent.agent_runtime import AgentRuntime
 from harness.config.settings import Settings
+from harness.context.budgeted_context_assembler import BudgetedContextAssembler
 from harness.context.context_assembler import ContextAssembler
 from harness.context.priority_order_assembler import PriorityOrderAssembler
 from harness.llm.base_llm import BaseLLM
@@ -140,8 +141,12 @@ def get_audit_emitter(
         secret_redactor=secret_redactor,
     )
 
-def get_context_assembler() -> ContextAssembler:
-    return PriorityOrderAssembler()
+def get_context_assembler(
+    settings: Settings = Depends(get_settings),
+    ) -> ContextAssembler:
+    return BudgetedContextAssembler(
+        max_tokens=settings.max_context_tokens
+        )
 
 
 def get_agent_runtime(

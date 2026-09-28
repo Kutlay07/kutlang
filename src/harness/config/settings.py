@@ -1,4 +1,5 @@
 from pathlib import Path
+from pydantic import Field
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -8,5 +9,6 @@ class Settings(BaseSettings):
     local_llm_model: str
     max_iterations: int
     workspace_root: Path
+    max_context_tokens: int = Field(default=8000, gt=0)
     
     model_config = SettingsConfigDict(env_file='.env')
