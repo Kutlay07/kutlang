@@ -152,12 +152,14 @@ def get_context_telemetry() -> ContextTelemetry:
 
 def get_context_assembler(
     settings: Settings = Depends(get_settings),
-    telemetry: ContextTelemetry = Depends(get_context_telemetry),
+    telemetry: ContextTelemetry | None = None,
     ) -> ContextAssembler:
+    if telemetry is None:
+        telemetry = get_context_telemetry()
     return BudgetedContextAssembler(
         max_tokens=settings.max_context_tokens,
         telemetry=telemetry,
-        )
+    )
 
 
 def get_agent_runtime(
