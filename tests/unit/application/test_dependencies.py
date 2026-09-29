@@ -3,9 +3,14 @@ from pathlib import Path
 from pydantic import ValidationError
 import pytest
 
-from harness.application.dependencies import get_context_assembler, get_tool_registry
+from harness.application.dependencies import (
+    get_context_assembler, 
+    get_tool_registry,
+    get_context_telemetry,
+)
 from harness.config.settings import Settings
 from harness.context.budgeted_context_assembler import BudgetedContextAssembler
+from harness.context.logging_context_telemetry import LoggingContextTelemetry
 
 
 settings = Settings(
@@ -22,10 +27,14 @@ def test_get_tool_registry_includes_glob():
     assert tool.name == "glob"
 
 
-def test_get_context_assembler_returns_priority_order_assembler():
-    assembler = get_context_assembler(settings)
-    
+def test_get_context_assembler_returns_budgeted_assembler_with_telemetry():
+    assembler = get_context_assembler(
+        settings,
+        telemetry=get_context_telemetry(),
+        )
+
     assert isinstance(assembler, BudgetedContextAssembler)
+    assert isinstance(assembler.telemetry, LoggingContextTelemetry)
 
 
 @pytest.mark.parametrize("invalid_budget", [0, -5])
