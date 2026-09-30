@@ -152,7 +152,7 @@ def get_context_telemetry() -> ContextTelemetry:
 
 def get_context_assembler(
     settings: Settings = Depends(get_settings),
-    telemetry: ContextTelemetry | None = None,
+    telemetry: ContextTelemetry = Depends(get_context_telemetry),
     ) -> ContextAssembler:
     if telemetry is None:
         telemetry = get_context_telemetry()
@@ -167,8 +167,9 @@ def get_agent_runtime(
     registry: ToolRegistry = Depends(get_tool_registry),
     policy_engine: PolicyEngine = Depends(get_policy_engine),
     approval_broker: ApprovalBroker = Depends(get_approval_broker),
-    settings: Settings = Depends(get_settings),
     audit_emitter: AuditEmitter = Depends(get_audit_emitter),
+    context_assembler: ContextAssembler = Depends(get_context_assembler),
+    settings: Settings = Depends(get_settings),
 ) -> AgentRuntime:
     return AgentRuntime(
         llm=llm,
@@ -176,5 +177,6 @@ def get_agent_runtime(
         policy_engine=policy_engine,
         approval_broker=approval_broker,
         audit_emitter=audit_emitter,
+        context_assembler=context_assembler,
         max_iterations=settings.max_iterations,
     )
