@@ -1,16 +1,23 @@
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from pydantic import ValidationError
 import pytest
 
 from harness.application.dependencies import (
-    get_context_assembler, 
+    get_context_assembler,
+    build_context_assembler, 
     get_tool_registry,
     get_context_telemetry,
+    get_agent_runtime,
 )
 from harness.config.settings import Settings
 from harness.context.budgeted_context_assembler import BudgetedContextAssembler
 from harness.context.logging_context_telemetry import LoggingContextTelemetry
+from harness.llm.local import LocalLLM
+from harness.observability.audit_emitter import AuditEmitter
+from harness.policy.approval_broker import ApprovalBroker
+from harness.policy.policy_engine import PolicyEngine
 
 
 settings = Settings(
@@ -47,3 +54,36 @@ def test_settings_rejects_non_positive_context_budget(invalid_budget):
             workspace_root=Path("."),
             max_context_tokens=invalid_budget,
         )
+
+
+def test_get_agent_runtime_wires_all_dependencies():
+    llm = MagicMock(spec=LocalLLM)
+    registry = get_tool_registry(settings)
+    policy_engine = MagicMock(spec=PolicyEngine)
+    approval_broker = MagicMock(spec=ApprovalBroker)
+    audit_emitter = MagicMock(spec=AuditEmitter)
+    assembler = build_context_assembler(settings)
+
+    runtime = get_agent_runtime(
+        llm=llm,
+        registry=registry,
+        policy_engine=policy_engine,
+        approval_broker=approval_broker,
+        audit_emitter=audit_emitter,
+        context_assembler=assembler,
+        settings=settings,
+    )
+
+    assert runtime.llm is llm
+    assert runtime.tools is registry
+    assert runtime.policy_engine is policy_engine
+    assert runtime.approval_broker is approval_broker
+    assert runtime.audit_emitter is audit_emitter
+    assert runtime.context_assembler is assembler
+    assert runtime.max_iterations == settings.max_iterations
+
+
+def test_build_context_assembler_direct_call_gets_concrete_telemetry():
+    assembler = build_context_assembler(settings)
+    
+    assert isinstance(assembler.telemetry, LoggingContextTelemetry)

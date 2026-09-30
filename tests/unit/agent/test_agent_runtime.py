@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import pytest
 import asyncio
 from unittest.mock import MagicMock
@@ -57,13 +59,21 @@ def audit_emitter():
     return MagicMock(spec=AuditEmitter)
 
 @pytest.fixture
-def runtime(llm, tools, policy_engine, approval_broker, audit_emitter):
+def context_assembler():
+    return FakeAssembler()
+
+@pytest.fixture
+def runtime(llm, tools, policy_engine, 
+            approval_broker, audit_emitter, 
+            context_assembler
+            ):
     return AgentRuntime(
         llm,
         tools,
         policy_engine,
         approval_broker,
         audit_emitter,
+        context_assembler,
     )
 
 
@@ -246,7 +256,9 @@ async def test_runtime_raises_when_max_iterations_exceeded(
     tools,
     policy_engine,
     approval_broker,
+    runtime,
     ):
+    runtime.max_iterations = 2
 
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "result"
@@ -260,15 +272,6 @@ async def test_runtime_raises_when_max_iterations_exceeded(
 
     llm.generate.return_value = AgentResponse(
         tool_calls=[tool_call],
-    )
-
-    runtime = AgentRuntime(
-        llm,
-        tools,
-        policy_engine,
-        approval_broker,
-        audit_emitter,
-        max_iterations=2,
     )
 
     with pytest.raises(RuntimeError, match="Maximum agent iterations exceeded"):
@@ -545,37 +548,29 @@ async def test_runtime_does_not_execute_tool_when_approval_is_rejected(
     approval_broker,
     runtime,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ASK,
         risk_level=RiskLevel.HIGH,
         approval_scope=ApprovalScope.SINGLE_CALL
     )
-    
+
     approval_broker.request_approval.return_value = ApprovalResult.REJECTED
-    
+
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
-    
+
     tool_call = ToolCall(
         call_id="call_123",
         name="read_file",
         arguments={"path": "main.py"},
     )
-    
-    runtime = AgentRuntime(
-        llm,
-        tools,
-        policy_engine,
-        approval_broker,
-        audit_emitter,
-    )
-    
+
     results = await runtime._execute_tool_calls(
         AgentResponse(tool_calls=[tool_call])
     )
-    
+
     assert len(results) == 1
     assert results[0].call_id == "call_123"
     assert results[0].tool_name == "read_file"
@@ -610,14 +605,6 @@ async def test_runtime_executes_tool_when_approval_is_granted(
         call_id="call_123",
         name="read_file",
         arguments={"path": "main.py"},
-    )
-    
-    runtime = AgentRuntime(
-        llm,
-        tools,
-        policy_engine,
-        approval_broker,
-        audit_emitter,
     )
     
     results = await runtime._execute_tool_calls(
@@ -657,14 +644,6 @@ async def test_runtime_does_not_execute_tool_when_approval_expires(
         call_id="call_123",
         name="read_file",
         arguments={"path": "main.py"},
-    )
-    
-    runtime = AgentRuntime(
-        llm,
-        tools,
-        policy_engine,
-        approval_broker,
-        audit_emitter,
     )
     
     results = await runtime._execute_tool_calls(
@@ -707,14 +686,6 @@ async def test_runtime_does_not_execute_tool_when_approval_is_canceled(
         arguments={"path": "main.py"},
     )
     
-    runtime = AgentRuntime(
-        llm,
-        tools,
-        policy_engine,
-        approval_broker,
-        audit_emitter,
-    )
-    
     results = await runtime._execute_tool_calls(
         AgentResponse(tool_calls=[tool_call])
     )
@@ -751,14 +722,6 @@ async def test_runtime_denies_tool_execution_when_policy_denies(
         call_id="call_123",
         name="read_file",
         arguments={"path": "main.py"},
-    )
-    
-    runtime = AgentRuntime(
-        llm,
-        tools,
-        policy_engine,
-        approval_broker,
-        audit_emitter,
     )
     
     results = await runtime._execute_tool_calls(
@@ -1093,3 +1056,58 @@ async def test_audit_failure_must_not_change_tool_execution_semantics(
     tool.execute.assert_called_once_with(path="main.py")
     assert results[0].is_error is False
     assert results[0].result == "file contents"
+
+
+@dataclass
+class FakeSection:
+    kind: str
+    content: str
+    priority: int
+    estimated_tokens: int
+
+class FakeAssembler:
+    def __init__(self):
+        self.calls = []
+        self.result = None
+
+    def assemble(self, sections):
+        self.calls.append(sections)
+        return self.result if self.result is not None else sections
+
+
+@pytest.mark.asyncio
+async def test_runtime_passes_sections_to_assembler(
+    runtime, llm, context_assembler,
+):
+    llm.generate.return_value = AgentResponse(text="ok")
+    section = FakeSection(
+        kind="history",
+        content="past context",
+        priority=1,
+        estimated_tokens=10,
+    )
+
+    await runtime.run("Hello", context_sections=[section])
+
+    assert len(context_assembler.calls) == 1
+    assert context_assembler.calls[0] == [section]
+
+
+@pytest.mark.asyncio
+async def test_runtime_uses_assembler_output_in_prompt(
+    runtime, llm, context_assembler,
+):
+    llm.generate.return_value = AgentResponse(text="ok")
+    assembled = FakeSection(
+        kind="history", content="ASSEMBLED CONTEXT",
+        priority=1, estimated_tokens=10)
+
+    context_assembler.result = [assembled]
+
+    await runtime.run("Hello", context_sections=[FakeSection(
+        kind="raw", content="raw", 
+        priority=2, estimated_tokens=5)])
+
+    first_message = llm.generate.call_args.args[0][0]
+    assert "ASSEMBLED CONTEXT" in first_message.content
+    assert "raw" not in first_message.content

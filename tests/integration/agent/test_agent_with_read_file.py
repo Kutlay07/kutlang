@@ -32,6 +32,19 @@ def approval_broker():
 def audit_emitter():
     return MagicMock(spec=AuditEmitter)
 
+class FakeAssembler:
+    def __init__(self):
+        self.calls = []
+        self.result = None
+
+    def assemble(self, sections):
+        self.calls.append(sections)
+        return self.result if self.result is not None else sections
+
+@pytest.fixture
+def context_assembler():
+    return FakeAssembler()
+
 
 @pytest.mark.asyncio
 async def test_agent_runtime_reads_file_with_real_tool(
@@ -40,6 +53,7 @@ async def test_agent_runtime_reads_file_with_real_tool(
     policy_engine, 
     approval_broker,
     audit_emitter,
+    context_assembler,
     ):
     
     policy_engine.evaluate.return_value = PolicyEvaluation(
@@ -77,6 +91,7 @@ async def test_agent_runtime_reads_file_with_real_tool(
         policy_engine, 
         approval_broker,
         audit_emitter,
+        context_assembler,
         )
 
     result = await runtime.run("Read the file")

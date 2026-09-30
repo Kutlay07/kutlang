@@ -3,6 +3,8 @@ import logging
 
 from harness.agent.agent_response import AgentResponse
 from harness.agent.tool_result import ToolResult
+from harness.context.context_assembler import ContextAssembler
+from harness.context.context_section import ContextSection
 from harness.llm.base_llm import BaseLLM
 from harness.llm.message import Message
 from harness.observability.approval_audit_data import ApprovalAuditData
@@ -48,6 +50,7 @@ class AgentRuntime:
         policy_engine: PolicyEngine,
         approval_broker: ApprovalBroker,
         audit_emitter: AuditEmitter,
+        context_assembler: ContextAssembler,
         max_iterations: int = 10,
     ):
         self.llm = llm
@@ -56,9 +59,17 @@ class AgentRuntime:
         self.policy_engine = policy_engine
         self.approval_broker = approval_broker
         self.audit_emitter = audit_emitter
+        self.context_assembler = context_assembler
 
 
-    async def run(self, prompt: str) -> AgentResponse:
+    async def run(
+        self, 
+        prompt: str,
+        context_sections: list[ContextSection] | None = None
+    ) -> AgentResponse:
+        if context_sections is not None:
+            prompt = self._build_prompt(prompt, context_sections)
+
         conversation = [
             Message(
                 role="user",
@@ -357,7 +368,7 @@ class AgentRuntime:
         audit_approval_result = AuditApprovalResult(
             approval_result.value
         )
-        
+
         if audit_approval_result == AuditApprovalResult.GRANTED:
             audit_outcome = AuditOutcome.APPROVED
         elif audit_approval_result == AuditApprovalResult.REJECTED:
@@ -367,7 +378,7 @@ class AgentRuntime:
             AuditApprovalResult.CANCELED,
         ):
             audit_outcome = AuditOutcome.FAILURE
-            
+
         approval_audit_data = ApprovalAuditData(
             risk_level=AuditPolicyRiskLevel(
                 approval_request.risk_level.value
@@ -377,7 +388,7 @@ class AgentRuntime:
             ),
             result=audit_approval_result,
         )
-        
+
         audit_event = AuditEvent(
             event_type=AuditEventType.APPROVAL_COMPLETED,
             timestamp=datetime.now(timezone.utc),
@@ -386,5 +397,15 @@ class AgentRuntime:
             outcome=audit_outcome,
             payload=approval_audit_data,
         )
-        
+
         self.audit_emitter.emit(audit_event)
+
+
+    def _build_prompt(
+        self,
+        prompt: str,
+        context_sections: list[ContextSection],
+        ) -> str:
+        context_sections = self.context_assembler.assemble(context_sections)
+        context_text = "\n\n".join(section.content for section in context_sections)
+        return f"{context_text}\n\n{prompt}"
