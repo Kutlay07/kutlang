@@ -256,8 +256,9 @@ async def test_runtime_raises_when_max_iterations_exceeded(
     tools,
     policy_engine,
     approval_broker,
-    context_assembler,
+    runtime,
     ):
+    runtime.max_iterations = 2
 
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "result"
@@ -271,16 +272,6 @@ async def test_runtime_raises_when_max_iterations_exceeded(
 
     llm.generate.return_value = AgentResponse(
         tool_calls=[tool_call],
-    )
-
-    runtime = AgentRuntime(
-        llm,
-        tools,
-        policy_engine,
-        approval_broker,
-        audit_emitter,
-        context_assembler,
-        max_iterations=2,
     )
 
     with pytest.raises(RuntimeError, match="Maximum agent iterations exceeded"):
@@ -555,41 +546,31 @@ async def test_runtime_does_not_execute_tool_when_approval_is_rejected(
     tools,
     policy_engine,
     approval_broker,
-    context_assembler,
     runtime,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ASK,
         risk_level=RiskLevel.HIGH,
         approval_scope=ApprovalScope.SINGLE_CALL
     )
-    
+
     approval_broker.request_approval.return_value = ApprovalResult.REJECTED
-    
+
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
-    
+
     tool_call = ToolCall(
         call_id="call_123",
         name="read_file",
         arguments={"path": "main.py"},
     )
-    
-    runtime = AgentRuntime(
-        llm,
-        tools,
-        policy_engine,
-        approval_broker,
-        audit_emitter,
-        context_assembler,
-    )
-    
+
     results = await runtime._execute_tool_calls(
         AgentResponse(tool_calls=[tool_call])
     )
-    
+
     assert len(results) == 1
     assert results[0].call_id == "call_123"
     assert results[0].tool_name == "read_file"
@@ -605,7 +586,6 @@ async def test_runtime_executes_tool_when_approval_is_granted(
     tools,
     policy_engine,
     approval_broker,
-    context_assembler,
     runtime,
     ):
     
@@ -627,15 +607,6 @@ async def test_runtime_executes_tool_when_approval_is_granted(
         arguments={"path": "main.py"},
     )
     
-    runtime = AgentRuntime(
-        llm,
-        tools,
-        policy_engine,
-        approval_broker,
-        audit_emitter,
-        context_assembler,
-    )
-    
     results = await runtime._execute_tool_calls(
         AgentResponse(tool_calls=[tool_call])
     )
@@ -654,7 +625,6 @@ async def test_runtime_does_not_execute_tool_when_approval_expires(
     tools,
     policy_engine,
     approval_broker,
-    context_assembler,
     runtime,
     ):
     
@@ -676,15 +646,6 @@ async def test_runtime_does_not_execute_tool_when_approval_expires(
         arguments={"path": "main.py"},
     )
     
-    runtime = AgentRuntime(
-        llm,
-        tools,
-        policy_engine,
-        approval_broker,
-        audit_emitter,
-        context_assembler,
-    )
-    
     results = await runtime._execute_tool_calls(
         AgentResponse(tool_calls=[tool_call])
     )
@@ -704,7 +665,6 @@ async def test_runtime_does_not_execute_tool_when_approval_is_canceled(
     tools,
     policy_engine,
     approval_broker,
-    context_assembler,
     runtime,
     ):
     
@@ -726,15 +686,6 @@ async def test_runtime_does_not_execute_tool_when_approval_is_canceled(
         arguments={"path": "main.py"},
     )
     
-    runtime = AgentRuntime(
-        llm,
-        tools,
-        policy_engine,
-        approval_broker,
-        audit_emitter,
-        context_assembler,
-    )
-    
     results = await runtime._execute_tool_calls(
         AgentResponse(tool_calls=[tool_call])
     )
@@ -754,7 +705,6 @@ async def test_runtime_denies_tool_execution_when_policy_denies(
     tools,
     policy_engine,
     approval_broker,
-    context_assembler,
     runtime,
     ):
     
@@ -772,15 +722,6 @@ async def test_runtime_denies_tool_execution_when_policy_denies(
         call_id="call_123",
         name="read_file",
         arguments={"path": "main.py"},
-    )
-    
-    runtime = AgentRuntime(
-        llm,
-        tools,
-        policy_engine,
-        approval_broker,
-        audit_emitter,
-        context_assembler,
     )
     
     results = await runtime._execute_tool_calls(
