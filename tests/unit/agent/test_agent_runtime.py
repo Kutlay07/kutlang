@@ -582,8 +582,8 @@ async def test_runtime_does_not_execute_tool_when_approval_is_rejected(
         tools,
         policy_engine,
         approval_broker,
-        context_assembler,
         audit_emitter,
+        context_assembler,
     )
     
     results = await runtime._execute_tool_calls(
@@ -632,8 +632,8 @@ async def test_runtime_executes_tool_when_approval_is_granted(
         tools,
         policy_engine,
         approval_broker,
-        context_assembler,
         audit_emitter,
+        context_assembler,
     )
     
     results = await runtime._execute_tool_calls(
@@ -681,8 +681,8 @@ async def test_runtime_does_not_execute_tool_when_approval_expires(
         tools,
         policy_engine,
         approval_broker,
-        context_assembler,
         audit_emitter,
+        context_assembler,
     )
     
     results = await runtime._execute_tool_calls(
@@ -731,8 +731,8 @@ async def test_runtime_does_not_execute_tool_when_approval_is_canceled(
         tools,
         policy_engine,
         approval_broker,
-        context_assembler,
         audit_emitter,
+        context_assembler,
     )
     
     results = await runtime._execute_tool_calls(
@@ -779,8 +779,8 @@ async def test_runtime_denies_tool_execution_when_policy_denies(
         tools,
         policy_engine,
         approval_broker,
-        context_assembler,
         audit_emitter,
+        context_assembler,
     )
     
     results = await runtime._execute_tool_calls(

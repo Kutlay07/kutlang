@@ -5,7 +5,8 @@ from pydantic import ValidationError
 import pytest
 
 from harness.application.dependencies import (
-    get_context_assembler, 
+    get_context_assembler,
+    build_context_assembler, 
     get_tool_registry,
     get_context_telemetry,
     get_agent_runtime,
@@ -61,7 +62,7 @@ def test_get_agent_runtime_wires_all_dependencies():
     policy_engine = MagicMock(spec=PolicyEngine)
     approval_broker = MagicMock(spec=ApprovalBroker)
     audit_emitter = MagicMock(spec=AuditEmitter)
-    assembler = get_context_assembler(settings)
+    assembler = build_context_assembler(settings)
 
     runtime = get_agent_runtime(
         llm=llm,
@@ -80,3 +81,9 @@ def test_get_agent_runtime_wires_all_dependencies():
     assert runtime.audit_emitter is audit_emitter
     assert runtime.context_assembler is assembler
     assert runtime.max_iterations == settings.max_iterations
+
+
+def test_build_context_assembler_direct_call_gets_concrete_telemetry():
+    assembler = build_context_assembler(settings)
+    
+    assert isinstance(assembler.telemetry, LoggingContextTelemetry)
