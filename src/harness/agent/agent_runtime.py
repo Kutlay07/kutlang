@@ -5,6 +5,7 @@ from harness.agent.agent_response import AgentResponse
 from harness.agent.tool_result import ToolResult
 from harness.context.context_assembler import ContextAssembler
 from harness.context.context_section import ContextSection
+from harness.context.section_producer import ConversationSectionProducer
 from harness.llm.base_llm import BaseLLM
 from harness.llm.message import Message
 from harness.observability.approval_audit_data import ApprovalAuditData
@@ -51,6 +52,7 @@ class AgentRuntime:
         approval_broker: ApprovalBroker,
         audit_emitter: AuditEmitter,
         context_assembler: ContextAssembler,
+        conversation_section_producer: ConversationSectionProducer,
         max_iterations: int = 10,
     ):
         self.llm = llm
@@ -60,6 +62,7 @@ class AgentRuntime:
         self.approval_broker = approval_broker
         self.audit_emitter = audit_emitter
         self.context_assembler = context_assembler
+        self.conversation_section_producer = conversation_section_producer
 
 
     async def run(
@@ -76,8 +79,15 @@ class AgentRuntime:
                 content=prompt,
             )
         ]
-        
+
         for _ in range(self.max_iterations):
+            section = None
+            if len(conversation) > 1:
+                section = self.conversation_section_producer.produce(conversation)
+
+            if section is not None:
+                self.context_assembler.assemble([section])
+
             response = self.llm.generate(
                 conversation.copy(),
                 self.tools.tools,
@@ -85,9 +95,9 @@ class AgentRuntime:
             
             if not response.tool_calls:
                 return response
-            
+
             results = await self._execute_tool_calls(response)
-            
+
             if response.text:
                 conversation.append(
                     Message(
@@ -95,7 +105,7 @@ class AgentRuntime:
                         content=response.text,
                     )
                 )
-                
+
             conversation.extend(response.tool_calls)
             conversation.extend(results)
             

@@ -17,34 +17,6 @@ from harness.tools.tool_registration import ToolRegistration
 from harness.tools.tool_registry import ToolRegistry
 from harness.security.workspace_path_guard import WorkspacePathGuard
 
-@pytest.fixture
-def llm():
-    return MagicMock(spec=BaseLLM)
-@pytest.fixture
-def policy_engine():
-    return MagicMock(spec=PolicyEngine)
-
-@pytest.fixture
-def approval_broker():
-    return MagicMock(spec=ApprovalBroker)
-
-@pytest.fixture
-def audit_emitter():
-    return MagicMock(spec=AuditEmitter)
-
-class FakeAssembler:
-    def __init__(self):
-        self.calls = []
-        self.result = None
-
-    def assemble(self, sections):
-        self.calls.append(sections)
-        return self.result if self.result is not None else sections
-
-@pytest.fixture
-def context_assembler():
-    return FakeAssembler()
-
 
 @pytest.mark.asyncio
 async def test_agent_runtime_reads_file_with_real_tool(
@@ -54,13 +26,14 @@ async def test_agent_runtime_reads_file_with_real_tool(
     approval_broker,
     audit_emitter,
     context_assembler,
+    history_producer,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ALLOW,
         risk_level=RiskLevel.LOW,
     )
-    
+
     file = tmp_path / "test.txt"
     file.write_text("Hello from file", encoding="utf-8")
 
@@ -84,7 +57,7 @@ async def test_agent_runtime_reads_file_with_real_tool(
             trust_level=TrustLevel.TRUSTED,
         )
     ])
-    
+
     runtime = AgentRuntime(
         llm, 
         tools,
@@ -92,6 +65,7 @@ async def test_agent_runtime_reads_file_with_real_tool(
         approval_broker,
         audit_emitter,
         context_assembler,
+        history_producer,
         )
 
     result = await runtime.run("Read the file")

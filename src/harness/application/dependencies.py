@@ -6,7 +6,9 @@ from harness.config.settings import Settings
 from harness.context.budgeted_context_assembler import BudgetedContextAssembler
 from harness.context.context_assembler import ContextAssembler
 from harness.context.context_telemetry import ContextTelemetry
+from harness.context.history_section_producer import HistorySectionProducer
 from harness.context.logging_context_telemetry import LoggingContextTelemetry
+from harness.context.section_producer import ConversationSectionProducer
 from harness.llm.base_llm import BaseLLM
 from harness.llm.local import LocalLLM
 from harness.policy.approval_broker import ApprovalBroker
@@ -167,6 +169,9 @@ def get_context_assembler(
     ) -> ContextAssembler:
     return build_context_assembler(settings, telemetry)
 
+def get_conversation_section_producer() -> ConversationSectionProducer:
+    return HistorySectionProducer()
+
 
 def get_agent_runtime(
     llm: BaseLLM = Depends(get_llm),
@@ -175,6 +180,7 @@ def get_agent_runtime(
     approval_broker: ApprovalBroker = Depends(get_approval_broker),
     audit_emitter: AuditEmitter = Depends(get_audit_emitter),
     context_assembler: ContextAssembler = Depends(get_context_assembler),
+    conversation_section_producer: ConversationSectionProducer = Depends(get_conversation_section_producer),
     settings: Settings = Depends(get_settings),
 ) -> AgentRuntime:
     return AgentRuntime(
@@ -184,5 +190,6 @@ def get_agent_runtime(
         approval_broker=approval_broker,
         audit_emitter=audit_emitter,
         context_assembler=context_assembler,
+        conversation_section_producer=conversation_section_producer,
         max_iterations=settings.max_iterations,
     )

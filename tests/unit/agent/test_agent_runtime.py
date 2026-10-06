@@ -58,14 +58,36 @@ def approval_broker():
 def audit_emitter():
     return MagicMock(spec=AuditEmitter)
 
+class FakeAssembler:
+    def __init__(self):
+        self.calls = []
+        self.result = None
+
+    def assemble(self, sections):
+        self.calls.append(sections)
+        return self.result if self.result is not None else sections
+
 @pytest.fixture
 def context_assembler():
     return FakeAssembler()
 
+class FakeHistoryProducer:
+    def __init__(self, section=None):
+        self.calls = []
+        self.section = section
+
+    def produce(self, conversation):
+        self.calls.append(conversation)
+        return self.section
+
+@pytest.fixture
+def history_producer():
+    return FakeHistoryProducer()
+
 @pytest.fixture
 def runtime(llm, tools, policy_engine, 
             approval_broker, audit_emitter, 
-            context_assembler
+            context_assembler, history_producer,
             ):
     return AgentRuntime(
         llm,
@@ -74,6 +96,7 @@ def runtime(llm, tools, policy_engine,
         approval_broker,
         audit_emitter,
         context_assembler,
+        conversation_section_producer=history_producer,
     )
 
 
@@ -723,7 +746,7 @@ async def test_runtime_denies_tool_execution_when_policy_denies(
         name="read_file",
         arguments={"path": "main.py"},
     )
-    
+
     results = await runtime._execute_tool_calls(
         AgentResponse(tool_calls=[tool_call])
     )
@@ -1050,9 +1073,9 @@ async def test_audit_failure_must_not_change_tool_execution_semantics(
     )
     
     events = [call.args[0] for call in audit_emitter.emit.call_args_list]
-    
+
     event_types = [event.event_type for event in events]
-    
+
     tool.execute.assert_called_once_with(path="main.py")
     assert results[0].is_error is False
     assert results[0].result == "file contents"
@@ -1064,16 +1087,6 @@ class FakeSection:
     content: str
     priority: int
     estimated_tokens: int
-
-class FakeAssembler:
-    def __init__(self):
-        self.calls = []
-        self.result = None
-
-    def assemble(self, sections):
-        self.calls.append(sections)
-        return self.result if self.result is not None else sections
-
 
 @pytest.mark.asyncio
 async def test_runtime_passes_sections_to_assembler(
@@ -1111,3 +1124,69 @@ async def test_runtime_uses_assembler_output_in_prompt(
     first_message = llm.generate.call_args.args[0][0]
     assert "ASSEMBLED CONTEXT" in first_message.content
     assert "raw" not in first_message.content
+
+
+@pytest.mark.asyncio
+async def test_runtime_does_not_produce_history_for_initial_prompt(
+    runtime, llm, context_assembler, history_producer,
+):
+    llm.generate.return_value = AgentResponse(text="ok")
+
+    section = FakeSection(
+        kind = "history",
+        content = "HISTORY",
+        priority = 10,
+        estimated_tokens = 2,
+    )
+    
+    history_producer.section = section
+    
+    await runtime.run("Hello")
+    
+
+    assert len(history_producer.calls) == 0
+    assert len(context_assembler.calls) == 0
+
+
+@pytest.mark.asyncio
+async def test_runtime_produces_history_on_subsequent_iteration(
+    runtime, llm, tools, policy_engine,
+    context_assembler, history_producer,
+):
+    policy_engine.evaluate.return_value = PolicyEvaluation(
+        decision=PolicyDecision.ALLOW,
+        risk_level=RiskLevel.LOW,
+    )
+
+    tool = MagicMock(spec=SyncBaseTool)
+    tool.execute.return_value = "file contents"
+    tools.get.return_value = tool
+
+    tool_call = ToolCall(
+        call_id="call_123",
+        name="read_file",
+        arguments={"path": "main.py"},
+    )
+
+    llm.generate.side_effect = [
+        AgentResponse(tool_calls=[tool_call]),
+        AgentResponse(text="Done"),
+    ]
+
+    history_producer.section = FakeSection(
+        kind="history", content="HISTORY", priority=10, estimated_tokens=2
+    )
+
+    await runtime.run("Do the task")
+
+    assert len(history_producer.calls) == 1
+    assert history_producer.calls[0] == [
+        Message(role="user", content="Do the task"),
+        tool_call, 
+        ToolResult(
+            call_id="call_123",
+            tool_name="read_file",
+            result="file contents"
+            )
+        ]
+    assert context_assembler.calls == [[history_producer.section]]
