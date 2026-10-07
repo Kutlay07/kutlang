@@ -6,11 +6,16 @@ from harness.llm.base_llm import BaseLLM
 from harness.observability.audit_emitter import AuditEmitter
 from harness.policy.approval_broker import ApprovalBroker
 from harness.policy.policy_engine import PolicyEngine
+from harness.tools.tool_registry import ToolRegistry
 
 
 @pytest.fixture
 def llm():
     return MagicMock(spec=BaseLLM)
+
+@pytest.fixture
+def tools():
+    return MagicMock(spec=ToolRegistry)
 
 @pytest.fixture
 def policy_engine():
@@ -27,10 +32,14 @@ def audit_emitter():
 class FakeAssembler:
     def __init__(self):
         self.calls = []
+        self.responses = []
         self.result = None
 
     def assemble(self, sections):
         self.calls.append(sections)
+        if self.responses:
+            first = self.responses.pop(0)
+            return first
         return self.result if self.result is not None else sections
 
 @pytest.fixture
@@ -43,7 +52,7 @@ class FakeHistoryProducer:
         self.section = section
 
     def produce(self, conversation):
-        self.calls.append(conversation)
+        self.calls.append(list(conversation))
         return self.section
 
 @pytest.fixture

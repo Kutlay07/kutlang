@@ -61,10 +61,14 @@ def audit_emitter():
 class FakeAssembler:
     def __init__(self):
         self.calls = []
+        self.responses = []
         self.result = None
 
     def assemble(self, sections):
         self.calls.append(sections)
+        if self.responses:
+            first = self.responses.pop(0)
+            return first
         return self.result if self.result is not None else sections
 
 @pytest.fixture
@@ -77,7 +81,7 @@ class FakeHistoryProducer:
         self.section = section
 
     def produce(self, conversation):
-        self.calls.append(conversation)
+        self.calls.append(list(conversation))
         return self.section
 
 @pytest.fixture
@@ -1138,9 +1142,9 @@ async def test_runtime_does_not_produce_history_for_initial_prompt(
         priority = 10,
         estimated_tokens = 2,
     )
-    
+
     history_producer.section = section
-    
+
     await runtime.run("Hello")
     
 
@@ -1174,7 +1178,7 @@ async def test_runtime_produces_history_on_subsequent_iteration(
     ]
 
     history_producer.section = FakeSection(
-        kind="history", content="HISTORY", priority=10, estimated_tokens=2
+        kind="history", content="HISTORY", priority=90, estimated_tokens=2
     )
 
     await runtime.run("Do the task")
@@ -1190,3 +1194,90 @@ async def test_runtime_produces_history_on_subsequent_iteration(
             )
         ]
     assert context_assembler.calls == [[history_producer.section]]
+
+
+def test_drop_oldest_round_removes_assistant_message(runtime):
+    user = Message(role="user", content="Fix the bug")
+    assistant = Message(role="assistant", content="Working on it")
+
+    conversation = [user, assistant]
+
+    runtime._drop_oldest_round(conversation)
+
+    assert conversation[0] is user
+    assert conversation == [user]
+
+
+def test_drop_oldest_round_removes_tool_call_with_its_result(runtime):
+    user = Message(role="user", content="Read the file")
+    tc = ToolCall(call_id="call_1", name="read_file", arguments={"path": "main.py"})
+    tr = ToolResult(call_id="call_1", tool_name="read_file", result="file contents")
+
+    conversation = [user, tc, tr]
+    runtime._drop_oldest_round(conversation)
+
+    assert conversation[0] is user
+    assert conversation == [user]
+
+
+def test_drop_oldest_round_keeps_newer_tool_pairs(runtime):
+    user = Message(role="user", content="Read the file")
+    tc1 = ToolCall(call_id="call_1", name="read_file", arguments={"path": "main.py"})
+    tr1 = ToolResult(call_id="call_1", tool_name="read_file", result="file contents")
+    tc2 = ToolCall(call_id="call_2", name="write_file", arguments={"path": "main.py"})
+    tr2 = ToolResult(call_id="call_2", tool_name="write_file", result="Successfully written")
+
+    conversation = [user, tc1, tr1, tc2, tr2]
+    runtime._drop_oldest_round(conversation)
+
+    assert conversation[0] is user
+    assert conversation == [user, tc2, tr2]
+    assert conversation[1] is tc2
+    assert conversation[2] is tr2
+
+
+@pytest.mark.asyncio
+async def test_run_trims_history_until_section_fits(
+    llm, policy_engine, tools, history_producer, context_assembler, runtime,
+):
+    policy_engine.evaluate.return_value = PolicyEvaluation(
+        decision=PolicyDecision.ALLOW,
+        risk_level=RiskLevel.LOW,
+    )
+
+    tool = MagicMock(spec=SyncBaseTool)
+    tool.execute.return_value = "file contents"
+    tools.get.return_value = tool
+
+    user = Message(role="user", content="Read the file")
+    tc1 = ToolCall(call_id="call_1", name="read_file", arguments={"path": "main.py"})
+    tr1 = ToolResult(call_id="call_1", tool_name="read_file", result="file contents")
+    tc2 = ToolCall(call_id="call_2", name="write_file", arguments={"path": "main.py"})
+    tr2 = ToolResult(call_id="call_2", tool_name="write_file", result="file contents")
+
+    section = FakeSection(
+        kind="history",
+        content="HISTORY",
+        priority=90,
+        estimated_tokens=2,
+    )
+
+    llm.generate.side_effect = [
+        AgentResponse(tool_calls=[tc1]),
+        AgentResponse(tool_calls=[tc2]),
+        AgentResponse(text="Done"),
+    ]
+
+    history_producer.section = section
+
+    context_assembler.responses = [[], [section]]
+
+    await runtime.run("Read the file")
+
+    assert len(history_producer.calls) == 2
+    assert history_producer.calls[0] == [user, tc1, tr1]
+    assert history_producer.calls[1] == [user, tc2, tr2]
+    assert len(context_assembler.calls) == 2
+    assert context_assembler.calls == [[section], [section]]
+    assert context_assembler.calls[0][0] is section
+    assert llm.generate.call_args_list[2].args[0] == [user, tc2, tr2]

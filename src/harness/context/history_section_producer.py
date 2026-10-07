@@ -1,4 +1,5 @@
 import json
+import unicodedata
 from collections.abc import Sequence
 
 from harness.agent.tool_call import ToolCall
@@ -20,7 +21,7 @@ class HistorySectionProducer:
             self._serialize_item(item)
             for item in conversation)
 
-        estimated_tokens = max(1, len(content) // 4)
+        estimated_tokens = self._estimate_tokens(content)
 
         return Section(
             kind="history",
@@ -44,3 +45,10 @@ class HistorySectionProducer:
                 return f"tool_result: {item.tool_name} -> {item.result}"
 
         raise TypeError("Unsupported conversation item type")
+
+
+    def _estimate_tokens(self, content: str) -> int:
+        wide = sum(unicodedata.east_asian_width(ch) in ("W", "F") for ch in content)
+    
+        narrow = len(content) - wide
+        return max(1, narrow // 4 + wide)

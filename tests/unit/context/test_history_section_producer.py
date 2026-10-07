@@ -67,3 +67,13 @@ def test_producer_token_estimate(producer):
     section = producer.produce(conversation)
     
     assert section.estimated_tokens == max(1, len(section.content) // 4)
+
+
+def test_producer_handles_cjk_undercount(producer):
+    conversation = [
+        Message(role="user", content="这是测试" * 50)
+    ]
+    
+    section = producer.produce(conversation)
+    
+    assert section.estimated_tokens >= 200
