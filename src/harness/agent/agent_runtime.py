@@ -5,7 +5,8 @@ from harness.agent.agent_response import AgentResponse
 from harness.agent.tool_result import ToolResult
 from harness.context.context_assembler import ContextAssembler
 from harness.context.context_section import ContextSection
-from harness.llm.base_llm import BaseLLM
+from harness.context.section_producer import ConversationSectionProducer
+from harness.llm.base_llm import BaseLLM, ConversationItem
 from harness.llm.message import Message
 from harness.observability.approval_audit_data import ApprovalAuditData
 from harness.observability.approval_requested_audit_data import (
@@ -37,6 +38,7 @@ from harness.policy.tool_execution_request import ToolExecutionRequest
 from harness.tools.tool_registry import ToolRegistry
 from harness.tools.async_base_tool import AsyncBaseTool
 from harness.tools.sync_base_tool import SyncBaseTool
+from harness.agent.tool_call import ToolCall
 
 
 logger = logging.getLogger(__name__)
@@ -51,6 +53,7 @@ class AgentRuntime:
         approval_broker: ApprovalBroker,
         audit_emitter: AuditEmitter,
         context_assembler: ContextAssembler,
+        conversation_section_producer: ConversationSectionProducer,
         max_iterations: int = 10,
     ):
         self.llm = llm
@@ -60,6 +63,7 @@ class AgentRuntime:
         self.approval_broker = approval_broker
         self.audit_emitter = audit_emitter
         self.context_assembler = context_assembler
+        self.conversation_section_producer = conversation_section_producer
 
 
     async def run(
@@ -76,8 +80,21 @@ class AgentRuntime:
                 content=prompt,
             )
         ]
-        
+
         for _ in range(self.max_iterations):
+            section = None
+            while len(conversation) > 1:
+                candidate = self.conversation_section_producer.produce(conversation)
+
+                if candidate is None:
+                    break
+
+                kept = self.context_assembler.assemble([candidate])
+                if kept:
+                    break
+
+                self._drop_oldest_round(conversation)
+
             response = self.llm.generate(
                 conversation.copy(),
                 self.tools.tools,
@@ -85,9 +102,9 @@ class AgentRuntime:
             
             if not response.tool_calls:
                 return response
-            
+
             results = await self._execute_tool_calls(response)
-            
+
             if response.text:
                 conversation.append(
                     Message(
@@ -95,7 +112,7 @@ class AgentRuntime:
                         content=response.text,
                     )
                 )
-                
+
             conversation.extend(response.tool_calls)
             conversation.extend(results)
             
@@ -409,3 +426,16 @@ class AgentRuntime:
         context_sections = self.context_assembler.assemble(context_sections)
         context_text = "\n\n".join(section.content for section in context_sections)
         return f"{context_text}\n\n{prompt}"
+
+
+    def _drop_oldest_round(
+        self,
+        conversation: list[ConversationItem],
+    ) -> None:
+        removed = conversation.pop(1)
+        
+        if isinstance(removed, ToolCall):
+            for index, item in enumerate(conversation):
+                if isinstance(item, ToolResult) and item.call_id == removed.call_id:
+                    conversation.pop(index)
+                    break

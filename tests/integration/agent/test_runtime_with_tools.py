@@ -19,31 +19,6 @@ from harness.security.workspace_path_guard import WorkspacePathGuard
 from harness.policy.trust_level import TrustLevel
 from harness.tools.tool_registration import ToolRegistration
 
-@pytest.fixture
-def policy_engine():
-    return MagicMock(spec=PolicyEngine)
-
-@pytest.fixture
-def approval_broker():
-    return MagicMock(spec=ApprovalBroker)
-
-@pytest.fixture
-def audit_emitter():
-    return MagicMock(spec=AuditEmitter)
-
-class FakeAssembler:
-    def __init__(self):
-        self.calls = []
-        self.result = None
-
-    def assemble(self, sections):
-        self.calls.append(sections)
-        return self.result if self.result is not None else sections
-
-@pytest.fixture
-def context_assembler():
-    return FakeAssembler()
-
 
 @pytest.mark.asyncio
 async def test_runtime_executes_real_read_file_tool(
@@ -51,16 +26,17 @@ async def test_runtime_executes_real_read_file_tool(
     policy_engine,
     approval_broker,
     audit_emitter,
-    context_assembler
+    context_assembler,
+    history_producer,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
     decision=PolicyDecision.ALLOW,
     risk_level=RiskLevel.LOW,
     )
-    
+
     workspace_boundary = WorkspacePathGuard(tmp_path)
-    
+
     file = tmp_path / "main.py"
     file.write_text("print('hello')", encoding="utf-8")
 
@@ -90,7 +66,8 @@ async def test_runtime_executes_real_read_file_tool(
         policy_engine,
         approval_broker,
         audit_emitter,
-        context_assembler
+        context_assembler,
+        history_producer,
         )
 
     result = await runtime.run("Read main.py")
@@ -111,6 +88,7 @@ async def test_runtime_handles_real_read_file_error(
     approval_broker,
     audit_emitter,
     context_assembler,
+    history_producer,
     ):
     
     policy_engine.evaluate.return_value = PolicyEvaluation(
@@ -149,6 +127,7 @@ async def test_runtime_handles_real_read_file_error(
         approval_broker,
         audit_emitter,
         context_assembler,
+        history_producer,
         )
 
     result = await runtime.run("Read missing.py")
@@ -171,6 +150,7 @@ async def test_runtime_executes_multiple_real_tools(
     approval_broker,
     audit_emitter,
     context_assembler,
+    history_producer,
     ):
     
     policy_engine.evaluate.return_value = PolicyEvaluation(
@@ -221,6 +201,7 @@ async def test_runtime_executes_multiple_real_tools(
         approval_broker,
         audit_emitter,
         context_assembler,
+        history_producer,
         )
 
     result = await runtime.run("Read both files")
@@ -245,6 +226,7 @@ async def test_runtime_executes_real_write_file_tool(
     approval_broker,
     audit_emitter,
     context_assembler,
+    history_producer,
     ):
     policy_engine.evaluate.return_value = PolicyEvaluation(
     decision=PolicyDecision.ALLOW,
@@ -285,6 +267,7 @@ async def test_runtime_executes_real_write_file_tool(
         approval_broker,
         audit_emitter,
         context_assembler,
+        history_producer,
         )
 
     result = await runtime.run("Create the file")
@@ -308,6 +291,7 @@ async def test_runtime_handles_real_write_file_error(
     approval_broker,
     audit_emitter,
     context_assembler,
+    history_producer,
     ):
     policy_engine.evaluate.return_value = PolicyEvaluation(
     decision=PolicyDecision.ALLOW,
@@ -349,6 +333,7 @@ async def test_runtime_handles_real_write_file_error(
         approval_broker,
         audit_emitter,
         context_assembler,
+        history_producer,
         )
 
     result = await runtime.run("Write the file")
@@ -370,6 +355,7 @@ async def test_runtime_executes_real_copy_file_tool(
     approval_broker,
     audit_emitter,
     context_assembler,
+    history_producer,
     ):
     policy_engine.evaluate.return_value = PolicyEvaluation(
     decision=PolicyDecision.ALLOW,
@@ -413,6 +399,7 @@ async def test_runtime_executes_real_copy_file_tool(
         approval_broker,
         audit_emitter,
         context_assembler,
+        history_producer,
         )
 
     result = await runtime.run("Copy original.py to copy.py")

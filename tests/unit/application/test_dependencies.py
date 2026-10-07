@@ -14,6 +14,7 @@ from harness.application.dependencies import (
 from harness.config.settings import Settings
 from harness.context.budgeted_context_assembler import BudgetedContextAssembler
 from harness.context.logging_context_telemetry import LoggingContextTelemetry
+from harness.context.section_producer import ConversationSectionProducer
 from harness.llm.local import LocalLLM
 from harness.observability.audit_emitter import AuditEmitter
 from harness.policy.approval_broker import ApprovalBroker
@@ -63,6 +64,7 @@ def test_get_agent_runtime_wires_all_dependencies():
     approval_broker = MagicMock(spec=ApprovalBroker)
     audit_emitter = MagicMock(spec=AuditEmitter)
     assembler = build_context_assembler(settings)
+    conversation_section_producer = MagicMock(spec=ConversationSectionProducer)
 
     runtime = get_agent_runtime(
         llm=llm,
@@ -71,6 +73,7 @@ def test_get_agent_runtime_wires_all_dependencies():
         approval_broker=approval_broker,
         audit_emitter=audit_emitter,
         context_assembler=assembler,
+        conversation_section_producer=conversation_section_producer,
         settings=settings,
     )
 
@@ -85,5 +88,5 @@ def test_get_agent_runtime_wires_all_dependencies():
 
 def test_build_context_assembler_direct_call_gets_concrete_telemetry():
     assembler = build_context_assembler(settings)
-    
+
     assert isinstance(assembler.telemetry, LoggingContextTelemetry)
