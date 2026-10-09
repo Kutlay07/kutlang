@@ -1,5 +1,3 @@
-
-
 class OutputBudget:
     def __init__(self, max_chars: int):
         if max_chars <= 0:

@@ -1,13 +1,18 @@
-from ..sync_base_tool import SyncBaseTool
-
+from harness.tools.output_budget import OutputBudget
+from harness.tools.sync_base_tool import SyncBaseTool
 from harness.security.workspace_boundary import WorkspaceBoundary
 
 
 class ReadFileTool(SyncBaseTool):
-    
-    def __init__(self, workspace_boundary: WorkspaceBoundary):
+
+    def __init__(
+        self,
+        workspace_boundary: WorkspaceBoundary,
+        output_budget: OutputBudget,
+    ):
         self.workspace_boundary = workspace_boundary
-        
+        self.output_budget = output_budget
+
     @property
     def name(self) -> str:
         return "read_file"
@@ -65,4 +70,7 @@ class ReadFileTool(SyncBaseTool):
         else:
             selected_lines = lines[start:start + limit]
 
-        return "".join(selected_lines)
+        normalized_lines = [line.rstrip("\r\n") for line in selected_lines]
+        budgeted_lines = self.output_budget.enforce(normalized_lines)
+
+        return "\n".join(budgeted_lines)

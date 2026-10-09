@@ -2,16 +2,16 @@ from harness.tools.sync_base_tool import SyncBaseTool
 from harness.tools.filesystem.provider import FilesystemToolProvider
 
 
-def test_filesystem_provider_returns_tools(workspace_boundary):
-    provider = FilesystemToolProvider(workspace_boundary)
+def test_filesystem_provider_returns_tools(workspace_boundary, output_budget):
+    provider = FilesystemToolProvider(workspace_boundary, output_budget)
     
     tools = provider.get_tools()
     
     assert len(tools) == 14
 
 
-def test_filesystem_provider_returns_expected_tools(workspace_boundary):
-    provider = FilesystemToolProvider(workspace_boundary)
+def test_filesystem_provider_returns_expected_tools(workspace_boundary, output_budget):
+    provider = FilesystemToolProvider(workspace_boundary, output_budget)
     
     tools = provider.get_tools()
     
@@ -34,8 +34,8 @@ def test_filesystem_provider_returns_expected_tools(workspace_boundary):
 
 
 
-def test_filesystem_provider_returns_base_tools(workspace_boundary):
-    provider = FilesystemToolProvider(workspace_boundary)
+def test_filesystem_provider_returns_base_tools(workspace_boundary, output_budget):
+    provider = FilesystemToolProvider(workspace_boundary, output_budget)
     
     tools = provider.get_tools()
     

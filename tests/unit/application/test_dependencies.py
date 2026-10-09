@@ -10,6 +10,7 @@ from harness.application.dependencies import (
     get_tool_registry,
     get_context_telemetry,
     get_agent_runtime,
+    READ_FILE_OUTPUT_BUDGET_CHARS
 )
 from harness.config.settings import Settings
 from harness.context.budgeted_context_assembler import BudgetedContextAssembler
@@ -27,6 +28,8 @@ settings = Settings(
     max_iterations=10,
     workspace_root=Path("."),
 )
+
+
 def test_get_tool_registry_includes_glob():
     registry = get_tool_registry(settings)
 
@@ -90,3 +93,10 @@ def test_build_context_assembler_direct_call_gets_concrete_telemetry():
     assembler = build_context_assembler(settings)
 
     assert isinstance(assembler.telemetry, LoggingContextTelemetry)
+
+
+def test_get_tool_registry_configures_read_file_output_budget():
+    registry = get_tool_registry(settings)
+    read_file_tool = registry.get("read_file")
+
+    assert read_file_tool.output_budget.max_chars == READ_FILE_OUTPUT_BUDGET_CHARS

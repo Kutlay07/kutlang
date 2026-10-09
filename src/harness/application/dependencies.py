@@ -37,6 +37,7 @@ from harness.tools.workspace_tool_provider import WorkspaceToolProvider
 
 
 SEARCH_OUTPUT_BUDGET_CHARS = 10_000
+READ_FILE_OUTPUT_BUDGET_CHARS = 20_000
 
 def get_settings() -> Settings:
     return Settings()
@@ -56,6 +57,9 @@ def get_tool_registry(
     boundary = WorkspacePathGuard(settings.workspace_root)
     search_visibility = SecretFileVisibility()
     output_budget = OutputBudget(max_chars=SEARCH_OUTPUT_BUDGET_CHARS)
+    read_file_output_budget = OutputBudget(
+        max_chars=READ_FILE_OUTPUT_BUDGET_CHARS
+    )
 
     discovery = EntryPointToolDiscovery()
     provider_classes = discovery.discover()
@@ -76,6 +80,13 @@ def get_tool_registry(
                     search_visibility,
                     output_budget,
                     )
+            )
+        elif provider_class is FilesystemToolProvider:
+            providers.append(
+                provider_class(
+                    boundary,
+                    read_file_output_budget,
+                )
             )
         elif issubclass(provider_class, WorkspaceToolProvider):
             providers.append(provider_class(boundary))
