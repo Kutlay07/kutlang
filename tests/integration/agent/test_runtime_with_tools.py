@@ -12,6 +12,7 @@ from harness.policy.policy_engine import PolicyEngine
 from harness.policy.policy_evaluation import PolicyEvaluation
 from harness.policy.risk_level import RiskLevel
 from harness.tools.filesystem.read_file import ReadFileTool
+from harness.tools.output_budget import OutputBudget
 from harness.tools.tool_registry import ToolRegistry
 from harness.tools.filesystem.write_file import WriteFileTool
 from harness.tools.filesystem.copy_file import CopyFileTool
@@ -36,6 +37,7 @@ async def test_runtime_executes_real_read_file_tool(
     )
 
     workspace_boundary = WorkspacePathGuard(tmp_path)
+    output_budget = OutputBudget(max_chars=20_000)
 
     file = tmp_path / "main.py"
     file.write_text("print('hello')", encoding="utf-8")
@@ -55,7 +57,7 @@ async def test_runtime_executes_real_read_file_tool(
 
     tools = ToolRegistry([
         ToolRegistration(
-            tool=ReadFileTool(workspace_boundary),
+            tool=ReadFileTool(workspace_boundary, output_budget),
             trust_level=TrustLevel.TRUSTED,
         ),
     ])
@@ -97,6 +99,7 @@ async def test_runtime_handles_real_read_file_error(
     )
     
     workspace_boundary = WorkspacePathGuard(tmp_path)
+    output_budget = OutputBudget(max_chars=20_000)
     
     missing_file = tmp_path / "missing.py"
 
@@ -115,7 +118,7 @@ async def test_runtime_handles_real_read_file_error(
 
     tools = ToolRegistry([
         ToolRegistration(
-            tool=ReadFileTool(workspace_boundary),
+            tool=ReadFileTool(workspace_boundary, output_budget),
             trust_level=TrustLevel.TRUSTED,
         ),
     ])
@@ -159,6 +162,7 @@ async def test_runtime_executes_multiple_real_tools(
     )
     
     workspace_boundary = WorkspacePathGuard(tmp_path)
+    output_budget = OutputBudget(max_chars=20_000)
     
     first_file = tmp_path / "first.py"
     second_file = tmp_path / "second.py"
@@ -189,7 +193,7 @@ async def test_runtime_executes_multiple_real_tools(
 
     tools = ToolRegistry([
         ToolRegistration(
-            tool=ReadFileTool(workspace_boundary),
+            tool=ReadFileTool(workspace_boundary, output_budget),
             trust_level=TrustLevel.TRUSTED,
         ),
     ])

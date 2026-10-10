@@ -1,13 +1,18 @@
-from ..sync_base_tool import SyncBaseTool
-
+from harness.tools.output_budget import OutputBudget
+from harness.tools.sync_base_tool import SyncBaseTool
 from harness.security.workspace_boundary import WorkspaceBoundary
 
 
 class ReadFileTool(SyncBaseTool):
-    
-    def __init__(self, workspace_boundary: WorkspaceBoundary):
+
+    def __init__(
+        self,
+        workspace_boundary: WorkspaceBoundary,
+        output_budget: OutputBudget,
+    ):
         self.workspace_boundary = workspace_boundary
-        
+        self.output_budget = output_budget
+
     @property
     def name(self) -> str:
         return "read_file"
@@ -54,10 +59,8 @@ class ReadFileTool(SyncBaseTool):
         if limit is not None and limit < 1:
             raise ValueError("limit must be >= 1")
 
-        lines = validated_path.read_text(
-            encoding="utf-8"
-        ).splitlines(keepends=True)
-
+        with validated_path.open("r", encoding="utf-8", newline="") as handle:
+            lines = handle.read().splitlines(keepends=True)
         start = 0 if offset is None else offset - 1
 
         if limit is None:
@@ -65,4 +68,5 @@ class ReadFileTool(SyncBaseTool):
         else:
             selected_lines = lines[start:start + limit]
 
-        return "".join(selected_lines)
+        selected_content = "".join(selected_lines)
+        return self.output_budget.enforce_text(selected_content)

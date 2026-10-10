@@ -96,3 +96,40 @@ def test_output_budget_does_not_mutate_input():
     budget.enforce(lines)
 
     assert lines == original
+
+
+def test_output_budget_preserves_text_within_limit():
+    budget = OutputBudget(max_chars=20)
+
+    content = "a\r\n\r\nb\r\n"
+
+    result = budget.enforce_text(content)
+
+    assert content == result
+
+
+def test_output_budget_truncates_text():
+    budget = OutputBudget(max_chars=20)
+
+    content = "x" * 30
+
+    result = budget.enforce_text(content)
+
+    assert result == "x" * 8 + "\n[truncated]"
+
+
+def test_output_budget_returns_compact_notice_when_full_notice_does_not_fit():
+    budget = OutputBudget(max_chars=4)
+
+    result = budget.enforce_text("12345")
+
+    assert result == "…"
+
+
+def test_output_budget_enforces_returns_marker_for_one_character_limit():
+    budget = OutputBudget(max_chars=1)
+
+    result = budget.enforce_text("12")
+
+    assert len(result) <= 1
+    assert result == "…"
