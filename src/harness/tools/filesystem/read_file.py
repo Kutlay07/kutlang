@@ -59,10 +59,8 @@ class ReadFileTool(SyncBaseTool):
         if limit is not None and limit < 1:
             raise ValueError("limit must be >= 1")
 
-        lines = validated_path.read_text(
-            encoding="utf-8"
-        ).splitlines(keepends=True)
-
+        with validated_path.open("r", encoding="utf-8", newline="") as handle:
+            lines = handle.read().splitlines(keepends=True)
         start = 0 if offset is None else offset - 1
 
         if limit is None:
@@ -70,7 +68,5 @@ class ReadFileTool(SyncBaseTool):
         else:
             selected_lines = lines[start:start + limit]
 
-        normalized_lines = [line.rstrip("\r\n") for line in selected_lines]
-        budgeted_lines = self.output_budget.enforce(normalized_lines)
-
-        return "\n".join(budgeted_lines)
+        selected_content = "".join(selected_lines)
+        return self.output_budget.enforce_text(selected_content)

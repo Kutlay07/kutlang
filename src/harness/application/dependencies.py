@@ -73,7 +73,7 @@ def get_tool_registry(
     providers = []
 
     for provider_class in provider_classes:
-        if provider_class is SearchToolProvider:
+        if issubclass(provider_class, SearchToolProvider):
             providers.append(
                 provider_class(
                     boundary, 
@@ -81,7 +81,7 @@ def get_tool_registry(
                     output_budget,
                     )
             )
-        elif provider_class is FilesystemToolProvider:
+        elif issubclass(provider_class, FilesystemToolProvider):
             providers.append(
                 provider_class(
                     boundary,

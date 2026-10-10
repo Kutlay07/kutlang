@@ -67,6 +67,7 @@ def test_read_file_supports_offset_and_limit(
         "line 3\n"
         "line 4\n"
         "line 5\n",
+        newline="\n",
         encoding="utf-8"
     )
     
@@ -78,7 +79,7 @@ def test_read_file_supports_offset_and_limit(
         limit=2,
     )
 
-    assert result == "line 2\nline 3"
+    assert result == "line 2\nline 3\n"
 
 
 def test_read_file_rejects_invalid_offset(
@@ -142,6 +143,7 @@ def test_read_file_returns_remaining_lines_when_limit_exceeds_file(
         "line 1\n"
         "line 2\n"
         "line 3\n",
+        newline="\n",
         encoding="utf-8",
     )
 
@@ -153,20 +155,21 @@ def test_read_file_returns_remaining_lines_when_limit_exceeds_file(
         limit=100,
     )
 
-    assert result == "line 2\nline 3"
+    assert result == "line 2\nline 3\n"
 
 
-def test_read_file_output_does_not_exceed_character_budget(tmp_path, workspace_boundary):
+def test_read_file_truncates_oversized_single_line_with_notice(tmp_path, workspace_boundary):
     file = tmp_path / "test.txt"
-    file.write_text("1234\n", encoding="utf-8")
+    file.write_text("x" * 30, encoding="utf-8")
 
-    output_budget = OutputBudget(max_chars=4)
+    output_budget = OutputBudget(max_chars=20)
 
     tool = ReadFileTool(workspace_boundary, output_budget)
 
     result = tool.execute(path="test.txt")
 
-    assert len(result) <= 4
+    assert len(result) == 20
+    assert result == "x" * 8 + "\n[truncated]"
 
 
 def test_read_file_truncation_notice(tmp_path, workspace_boundary):
@@ -174,6 +177,7 @@ def test_read_file_truncation_notice(tmp_path, workspace_boundary):
     file.write_text(
         "line12\n"
         "loongloonglooongtextloongloonglooongtext",
+        newline="\n",
         encoding="utf-8"
     )
 
@@ -183,8 +187,37 @@ def test_read_file_truncation_notice(tmp_path, workspace_boundary):
 
     result = tool.execute(path="test.txt")
 
-    expected_notice = "[truncated: 1/2 lines - refine search]"
+    expected_notice = "[truncated]"
 
     assert result.startswith("line12\n")
-    assert expected_notice in result
+    assert result.endswith("\n" + expected_notice)
     assert len(result) <= 46
+
+
+def test_read_file_preserves_original_line_endings_and_blank_lines(
+    tmp_path, workspace_boundary, output_budget
+):
+    file = tmp_path / "test.txt"
+    file.write_bytes(
+        b"a\r\n\r\nb\r\n"
+    )
+
+    tool = ReadFileTool(workspace_boundary, output_budget)
+
+    result = tool.execute(path="test.txt")
+
+    assert result == "a\r\n\r\nb\r\n"
+
+
+def test_read_file_preserves_unicode_line_separator(
+    tmp_path, workspace_boundary, output_budget
+):
+    file = tmp_path / "test.txt"
+    content = "alpha\u2028beta"
+    file.write_bytes(content.encode("utf-8"))
+
+    tool = ReadFileTool(workspace_boundary, output_budget)
+
+    result = tool.execute(path="test.txt")
+
+    assert result == content

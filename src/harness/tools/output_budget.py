@@ -39,3 +39,20 @@ class OutputBudget:
         )
 
         return candidate_lines + [final_notice]
+
+
+    def enforce_text(self, content: str) -> str:
+        if len(content) <= self.max_chars:
+            return content
+
+        notice = "[truncated]"
+
+        prefix_length = self.max_chars - len(notice) - 1
+
+        if prefix_length > 0:
+            return content[:prefix_length] + "\n" + notice
+
+        if len(notice) <= self.max_chars:
+            return notice
+
+        return "…"

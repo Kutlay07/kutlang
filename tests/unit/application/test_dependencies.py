@@ -10,7 +10,8 @@ from harness.application.dependencies import (
     get_tool_registry,
     get_context_telemetry,
     get_agent_runtime,
-    READ_FILE_OUTPUT_BUDGET_CHARS
+    READ_FILE_OUTPUT_BUDGET_CHARS,
+    SEARCH_OUTPUT_BUDGET_CHARS,
 )
 from harness.config.settings import Settings
 from harness.context.budgeted_context_assembler import BudgetedContextAssembler
@@ -20,6 +21,9 @@ from harness.llm.local import LocalLLM
 from harness.observability.audit_emitter import AuditEmitter
 from harness.policy.approval_broker import ApprovalBroker
 from harness.policy.policy_engine import PolicyEngine
+from harness.tools.entry_point_tool_discovery import EntryPointToolDiscovery
+from harness.tools.filesystem.provider import FilesystemToolProvider
+from harness.tools.search.provider import SearchToolProvider
 
 
 settings = Settings(
@@ -100,3 +104,35 @@ def test_get_tool_registry_configures_read_file_output_budget():
     read_file_tool = registry.get("read_file")
 
     assert read_file_tool.output_budget.max_chars == READ_FILE_OUTPUT_BUDGET_CHARS
+
+
+def test_get_tool_registry_injects_budget_into_filesystem_provider_subclass(monkeypatch):
+    class FakeFilesystemProvider(FilesystemToolProvider):
+        pass
+
+    monkeypatch.setattr(
+        EntryPointToolDiscovery,
+        "discover",
+        lambda self: [FakeFilesystemProvider],
+    )
+
+    registry = get_tool_registry(settings)
+    read_file = registry.get("read_file")
+
+    assert read_file.output_budget.max_chars == READ_FILE_OUTPUT_BUDGET_CHARS
+
+
+def test_get_tool_registry_injects_budget_into_search_tool_provider_subclass(monkeypatch):
+    class FakeSearchProvider(SearchToolProvider):
+        pass
+
+    monkeypatch.setattr(
+        EntryPointToolDiscovery,
+        "discover",
+        lambda self: [FakeSearchProvider],
+    )
+
+    registry = get_tool_registry(settings)
+    glob = registry.get("glob")
+
+    assert glob.output_budget.max_chars == SEARCH_OUTPUT_BUDGET_CHARS

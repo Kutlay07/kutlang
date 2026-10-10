@@ -72,6 +72,12 @@ async def test_agent_runtime_reads_file_with_real_tool(
         )
 
     result = await runtime.run("Read the file")
+    second_conversation = llm.generate.call_args_list[1].args[0]
+    tool_result = second_conversation[-1]
 
     assert result.text == "The file says: Hello from file"
     assert llm.generate.call_count == 2
+    assert tool_result.call_id == "call_123"
+    assert tool_result.tool_name == "read_file"
+    assert tool_result.result == "Hello from file"
+    assert tool_result.is_error is False
