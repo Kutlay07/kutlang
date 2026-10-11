@@ -4,11 +4,16 @@ from harness.agent.tool_call import ToolCall
 from harness.agent.tool_result import ToolResult
 from harness.context.history_section_producer import HistorySectionProducer
 from harness.llm.message import Message
-
+from harness.tools.output_budget import OutputBudget
 
 @pytest.fixture
-def producer():
-    return HistorySectionProducer()
+def output_budget():
+    return OutputBudget(max_chars=20_000)
+
+@pytest.fixture
+def producer(output_budget):
+    return HistorySectionProducer(output_budget=output_budget)
+
 
 def test_producer_builds_history_section_from_conversation(producer):
     conversation = [
@@ -77,3 +82,21 @@ def test_producer_handles_cjk_undercount(producer):
     section = producer.produce(conversation)
     
     assert section.estimated_tokens >= 200
+
+
+def test_history_producer_budgets_tool_result_before_estimating():
+    output_budget = OutputBudget(max_chars=20)
+
+    producer = HistorySectionProducer(output_budget=output_budget)
+
+    tool_result = ToolResult(
+        call_id="call_123",
+        tool_name="read_file",
+        result="x" * 30,
+    )
+
+    section = producer.produce([tool_result])
+
+    assert section.content == "tool_result: read_file -> " + "x" * 8 + "\n[truncated]"
+    assert tool_result.result == "x" * 30
+    assert section.estimated_tokens == max(1, len(section.content) // 4)

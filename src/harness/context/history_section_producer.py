@@ -7,12 +7,21 @@ from harness.agent.tool_result import ToolResult
 from harness.context.context_section import ContextSection, Section
 from harness.llm.base_llm import ConversationItem
 from harness.llm.message import Message
+from harness.tools.output_budget import OutputBudget
 
 
 class HistorySectionProducer:
+
+    def __init__(
+        self,
+        output_budget: OutputBudget,
+    ):
+        self.output_budget = output_budget
+
+
     def produce(
         self, 
-        conversation: Sequence[ConversationItem]
+        conversation: Sequence[ConversationItem],
     ) -> ContextSection | None:
         if not conversation:
             return None
@@ -39,10 +48,11 @@ class HistorySectionProducer:
             return "tool_call: " + item.name + " " + json.dumps(item.arguments, sort_keys=True)
 
         if isinstance(item, ToolResult):
+            item_result = self.output_budget.enforce_text(item.result)
             if item.is_error:
-                return f"tool_result_error: {item.tool_name} -> {item.result}"
+                return f"tool_result_error: {item.tool_name} -> {item_result}"
             else:
-                return f"tool_result: {item.tool_name} -> {item.result}"
+                return f"tool_result: {item.tool_name} -> {item_result}"
 
         raise TypeError("Unsupported conversation item type")
 

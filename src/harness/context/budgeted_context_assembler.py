@@ -5,12 +5,12 @@ from harness.context.context_telemetry import ContextTelemetry
 class BudgetedContextAssembler:
     """Emits sections in priority order, stopping before the first
     section that would exceed the token budget (inclusive boundary)."""
-    
+
     def __init__(
-        self, 
-        max_tokens: int, 
+        self,
+        max_tokens: int,
         telemetry: ContextTelemetry | None = None
-        ):
+    ):
         self.max_tokens = max_tokens
         self.telemetry = telemetry
 

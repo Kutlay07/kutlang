@@ -38,6 +38,7 @@ from harness.tools.workspace_tool_provider import WorkspaceToolProvider
 
 SEARCH_OUTPUT_BUDGET_CHARS = 10_000
 READ_FILE_OUTPUT_BUDGET_CHARS = 20_000
+TOOL_RESULT_OUTPUT_BUDGET_CHARS = 20_000
 
 def get_settings() -> Settings:
     return Settings()
@@ -47,6 +48,9 @@ def get_llm(settings: Settings = Depends(get_settings)) -> BaseLLM:
     return LocalLLM(
         base_url=settings.local_llm_base_url,
         model=settings.local_llm_model,
+        output_budget=OutputBudget(
+            max_chars=TOOL_RESULT_OUTPUT_BUDGET_CHARS
+        )
     )
 
 
@@ -181,7 +185,9 @@ def get_context_assembler(
     return build_context_assembler(settings, telemetry)
 
 def get_conversation_section_producer() -> ConversationSectionProducer:
-    return HistorySectionProducer()
+    return HistorySectionProducer(output_budget=OutputBudget(
+        max_chars=TOOL_RESULT_OUTPUT_BUDGET_CHARS
+    ))
 
 
 def get_agent_runtime(

@@ -23,12 +23,12 @@ from harness.security.workspace_path_guard import WorkspacePathGuard
 async def test_agent_runtime_reads_file_with_real_tool(
     tmp_path,
     llm,
-    policy_engine, 
+    policy_engine,
     approval_broker,
     audit_emitter,
     context_assembler,
     history_producer,
-    ):
+):
 
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ALLOW,
@@ -62,9 +62,9 @@ async def test_agent_runtime_reads_file_with_real_tool(
     ])
 
     runtime = AgentRuntime(
-        llm, 
+        llm,
         tools,
-        policy_engine, 
+        policy_engine,
         approval_broker,
         audit_emitter,
         context_assembler,

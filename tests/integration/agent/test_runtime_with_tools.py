@@ -92,15 +92,15 @@ async def test_runtime_handles_real_read_file_error(
     context_assembler,
     history_producer,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
     decision=PolicyDecision.ALLOW,
     risk_level=RiskLevel.LOW,
     )
-    
+
     workspace_boundary = WorkspacePathGuard(tmp_path)
     output_budget = OutputBudget(max_chars=20_000)
-    
+
     missing_file = tmp_path / "missing.py"
 
     llm = MagicMock(spec=BaseLLM)
@@ -155,15 +155,15 @@ async def test_runtime_executes_multiple_real_tools(
     context_assembler,
     history_producer,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
     decision=PolicyDecision.ALLOW,
     risk_level=RiskLevel.LOW,
     )
-    
+
     workspace_boundary = WorkspacePathGuard(tmp_path)
     output_budget = OutputBudget(max_chars=20_000)
-    
+
     first_file = tmp_path / "first.py"
     second_file = tmp_path / "second.py"
 
@@ -233,12 +233,12 @@ async def test_runtime_executes_real_write_file_tool(
     history_producer,
     ):
     policy_engine.evaluate.return_value = PolicyEvaluation(
-    decision=PolicyDecision.ALLOW,
-    risk_level=RiskLevel.LOW,
+        decision=PolicyDecision.ALLOW,
+        risk_level=RiskLevel.LOW,
     )
-    
+
     workspace_boundary = WorkspacePathGuard(tmp_path)
-    
+
     file = tmp_path / "created.py"
 
     llm = MagicMock(spec=BaseLLM)
@@ -297,13 +297,14 @@ async def test_runtime_handles_real_write_file_error(
     context_assembler,
     history_producer,
     ):
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
-    decision=PolicyDecision.ALLOW,
-    risk_level=RiskLevel.LOW,
+        decision=PolicyDecision.ALLOW,
+        risk_level=RiskLevel.LOW,
     )
-    
+
     workspace_boundary = WorkspacePathGuard(tmp_path)
-    
+
     directory = tmp_path / "directory"
     directory.mkdir()
 
@@ -360,14 +361,15 @@ async def test_runtime_executes_real_copy_file_tool(
     audit_emitter,
     context_assembler,
     history_producer,
-    ):
+):
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
-    decision=PolicyDecision.ALLOW,
-    risk_level=RiskLevel.LOW,
+        decision=PolicyDecision.ALLOW,
+        risk_level=RiskLevel.LOW,
     )
-    
+
     workspace_boundary = WorkspacePathGuard(tmp_path)
-    
+
     source = tmp_path / "original.py"
     destination = tmp_path / "copy.py"
 

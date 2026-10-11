@@ -1,31 +1,37 @@
 from unittest.mock import MagicMock, patch, ANY
 
+import pytest
+
 from harness.llm.base_llm import BaseLLM
 from harness.llm.message import Message
 from harness.llm.openai import OpenAILLM
 from harness.agent.agent_response import AgentResponse
+from harness.tools.output_budget import OutputBudget
 from harness.tools.sync_base_tool import BaseTool
 from harness.agent.tool_call import ToolCall
 from harness.agent.tool_result import ToolResult
 
+@pytest.fixture
+def output_budget():
+    return OutputBudget(max_chars=20_000)
 
-def test_openai_llm_initializes():
+def test_openai_llm_initializes(output_budget):
     with patch("harness.llm.openai.OpenAI") as openai:
-        llm = OpenAILLM("gpt-5")
+        llm = OpenAILLM("gpt-5", output_budget=output_budget)
 
         openai.assert_called_once_with()
         assert llm.client is openai.return_value
         assert llm.model == "gpt-5"
 
 
-def test_openai_llm_implements_base_llm():
+def test_openai_llm_implements_base_llm(output_budget):
     with patch("harness.llm.openai.OpenAI"):
-        llm = OpenAILLM("gpt-5")
+        llm = OpenAILLM("gpt-5", output_budget=output_budget)
 
         assert isinstance(llm, BaseLLM)
 
 
-def test_openai_llm_generate():
+def test_openai_llm_generate(output_budget):
     with patch("harness.llm.openai.OpenAI") as openai:
         client = openai.return_value
 
@@ -34,7 +40,7 @@ def test_openai_llm_generate():
 
         client.responses.create.return_value = response
 
-        llm = OpenAILLM("gpt-5")
+        llm = OpenAILLM("gpt-5", output_budget=output_budget)
 
         messages = [
             Message(role="user", content="Hello"),
@@ -87,7 +93,7 @@ def test_openai_llm_generate():
         assert result.tool_calls is None
 
 
-def test_openai_llm_parses_tool_calls():
+def test_openai_llm_parses_tool_calls(output_budget):
     with patch("harness.llm.openai.OpenAI") as openai:
         client = openai.return_value
 
@@ -103,7 +109,7 @@ def test_openai_llm_parses_tool_calls():
 
         client.responses.create.return_value = response
 
-        llm = OpenAILLM("gpt-5")
+        llm = OpenAILLM("gpt-5", output_budget=output_budget)
 
         messages = [
             Message(
@@ -139,7 +145,7 @@ def test_openai_llm_parses_tool_calls():
         assert result.text is None
 
 
-def test_openai_llm_builds_tool_call_and_result_input():
+def test_openai_llm_builds_tool_call_and_result_input(output_budget):
     with patch("harness.llm.openai.OpenAI") as openai:
         client = openai.return_value
 
@@ -149,7 +155,7 @@ def test_openai_llm_builds_tool_call_and_result_input():
 
         client.responses.create.return_value = response
 
-        llm = OpenAILLM("gpt-5")
+        llm = OpenAILLM("gpt-5", output_budget=output_budget)
 
         conversation = [
             Message(
@@ -211,7 +217,7 @@ def test_openai_llm_builds_tool_call_and_result_input():
         assert result.text == "Done"
 
 
-def test_openai_llm_handles_malformed_tool_arguments():
+def test_openai_llm_handles_malformed_tool_arguments(output_budget):
     with patch("harness.llm.openai.OpenAI") as openai:
         client = openai.return_value
 
@@ -227,7 +233,7 @@ def test_openai_llm_handles_malformed_tool_arguments():
 
         client.responses.create.return_value = response
 
-        llm = OpenAILLM("gpt-5")
+        llm = OpenAILLM("gpt-5", output_budget=output_budget)
 
         result = llm.generate(
             [
@@ -241,3 +247,39 @@ def test_openai_llm_handles_malformed_tool_arguments():
 
         assert result.text is not None
         assert "Invalid tool arguments" in result.text
+
+
+def test_openai_llm_truncates_oversized_tool_result_at_serialization():
+    output_budget = OutputBudget(max_chars=20)
+
+    with patch("harness.llm.openai.OpenAI"):
+        llm = OpenAILLM("gpt-5", output_budget=output_budget)
+
+        tool_result = ToolResult(
+            call_id="call_123",
+            tool_name="read_file",
+            result="x" * 30,
+            is_error=False
+        )
+
+        content = llm._build_input([tool_result])
+
+        assert content[-1]["output"] == "x" * 8 + "\n[truncated]"
+        assert tool_result.result == "x" * 30
+        assert content[-1]["call_id"] == "call_123"
+
+
+def test_openai_llm_does_not_truncate_regular_messages():
+    output_budget = OutputBudget(max_chars=20)
+
+    with patch("harness.llm.openai.OpenAI"):
+        openai_llm = OpenAILLM("gpt-5", output_budget=output_budget)
+
+        message = Message(
+            role="user",
+            content="x" * 30,
+        )
+
+        result = openai_llm._build_input([message])
+
+        assert result[0]["content"] == "x" * 30
