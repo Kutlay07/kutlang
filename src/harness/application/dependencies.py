@@ -185,7 +185,9 @@ def get_context_assembler(
     return build_context_assembler(settings, telemetry)
 
 def get_conversation_section_producer() -> ConversationSectionProducer:
-    return HistorySectionProducer()
+    return HistorySectionProducer(output_budget=OutputBudget(
+        max_chars=TOOL_RESULT_OUTPUT_BUDGET_CHARS
+    ))
 
 
 def get_agent_runtime(

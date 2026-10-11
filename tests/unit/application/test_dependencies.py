@@ -11,12 +11,14 @@ from harness.application.dependencies import (
     get_context_telemetry,
     get_agent_runtime,
     get_llm,
+    get_conversation_section_producer,
     READ_FILE_OUTPUT_BUDGET_CHARS,
     SEARCH_OUTPUT_BUDGET_CHARS,
     TOOL_RESULT_OUTPUT_BUDGET_CHARS,
 )
 from harness.config.settings import Settings
 from harness.context.budgeted_context_assembler import BudgetedContextAssembler
+from harness.context.history_section_producer import HistorySectionProducer
 from harness.context.logging_context_telemetry import LoggingContextTelemetry
 from harness.context.section_producer import ConversationSectionProducer
 from harness.llm.local import LocalLLM
@@ -25,6 +27,7 @@ from harness.policy.approval_broker import ApprovalBroker
 from harness.policy.policy_engine import PolicyEngine
 from harness.tools.entry_point_tool_discovery import EntryPointToolDiscovery
 from harness.tools.filesystem.provider import FilesystemToolProvider
+from harness.tools.output_budget import OutputBudget
 from harness.tools.search.provider import SearchToolProvider
 
 
@@ -145,3 +148,10 @@ def test_get_llm_configures_output_budget():
 
     assert isinstance(llm, LocalLLM)
     assert llm.output_budget.max_chars == TOOL_RESULT_OUTPUT_BUDGET_CHARS
+
+
+def test_get_conversation_section_producer_configures_output_budget():
+    section_producer = get_conversation_section_producer()
+
+    assert isinstance(section_producer, HistorySectionProducer)
+    assert section_producer.output_budget.max_chars == TOOL_RESULT_OUTPUT_BUDGET_CHARS
