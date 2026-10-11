@@ -5,16 +5,24 @@ from harness.agent.agent_response import AgentResponse
 from harness.tools.base_tool import BaseTool
 from harness.agent.tool_call import ToolCall
 from harness.agent.tool_result import ToolResult
+from harness.tools.output_budget import OutputBudget
 
 from .base_llm import BaseLLM, ConversationItem
 from .message import Message
 
 
 class OpenAILLM(BaseLLM):
-    def __init__(self, model: str):
+    def __init__(
+        self,
+        model: str,
+        output_budget: OutputBudget,
+    ):
         self.client = OpenAI()
         self.model = model
-        
+
+        self.output_budget = output_budget
+
+
     def _parse_tool_calls(
         self,
         response,
@@ -39,7 +47,8 @@ class OpenAILLM(BaseLLM):
             )
 
         return tool_calls, None
-    
+
+
     def _build_input(self, conversation):
         inputs = []
 
@@ -67,11 +76,12 @@ class OpenAILLM(BaseLLM):
                     {
                         "type": "function_call_output",
                         "call_id": item.call_id,
-                        "output": item.result,
+                        "output": self.output_budget.enforce_text(item.result),
                     }
                 )
 
         return inputs
+
 
     def generate(
         self,

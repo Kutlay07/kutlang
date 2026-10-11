@@ -4,9 +4,11 @@ from harness.agent.agent_response import AgentResponse
 from harness.llm.base_llm import BaseLLM
 from harness.llm.local import LocalLLM
 from harness.llm.message import Message
+from harness.tools.output_budget import OutputBudget
 
 
 def test_local_llm_implements_current_generate_contract():
+    output_budget = OutputBudget(max_chars=20_000)
     mock_response = MagicMock()
     mock_response.choices[0].message.content = "Hello"
 
@@ -17,6 +19,7 @@ def test_local_llm_implements_current_generate_contract():
         llm = LocalLLM(
             base_url="http://test/v1",
             model="test-model",
+            output_budget=output_budget,
         )
 
         result = llm.generate(

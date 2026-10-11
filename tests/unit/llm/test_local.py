@@ -7,15 +7,21 @@ from harness.llm.local import LocalLLM
 from harness.agent.agent_response import AgentResponse
 from harness.agent.tool_call import ToolCall
 from harness.agent.tool_result import ToolResult
+from harness.tools.output_budget import OutputBudget
 from harness.tools.sync_base_tool import BaseTool
 
 
 
-def test_local_llm_initializes():
+@pytest.fixture
+def output_budget():
+    return OutputBudget(max_chars=20_000)
+
+def test_local_llm_initializes(output_budget):
     with patch("harness.llm.local.OpenAI") as openai:
         llm = LocalLLM(
             base_url="http://test/v1",
             model="test-model",
+            output_budget=output_budget,
         )
         
         openai.assert_called_once_with(
@@ -27,17 +33,18 @@ def test_local_llm_initializes():
         assert llm.model == "test-model"
 
 
-def test_local_llm_implements_base_llm():
+def test_local_llm_implements_base_llm(output_budget):
     with patch("harness.llm.local.OpenAI"):
         llm = LocalLLM(
             base_url="http://test/v1",
             model="test-model",
+            output_budget=output_budget,
         )
         
         assert isinstance(llm, BaseLLM)
 
 
-def test_local_llm_generate():
+def test_local_llm_generate(output_budget):
     mock_client = MagicMock()
     mock_response = MagicMock()
     
@@ -48,6 +55,7 @@ def test_local_llm_generate():
     llm = LocalLLM(
         base_url="http://test/v1",
         model="test-model",
+        output_budget=output_budget,
     )
     
     llm.client = mock_client
@@ -77,10 +85,11 @@ def test_local_llm_generate():
     assert result.text == "Hello world"
 
 
-def test_build_input():
+def test_build_input(output_budget):
     llm = LocalLLM(
         base_url="http://test/v1",
         model="test-model",
+        output_budget=output_budget,
     )
     
     tool_call = ToolCall(
@@ -102,10 +111,11 @@ def test_build_input():
     assert message["tool_calls"][0]["function"]["arguments"] == '{"path": "test.py"}'
 
 
-def test_tool_result_build_input():
+def test_tool_result_build_input(output_budget):
     llm = LocalLLM(
         base_url="http://test/v1",
         model="test-model",
+        output_budget=output_budget,
     )
         
     tool_result = ToolResult(
@@ -126,7 +136,7 @@ def test_tool_result_build_input():
     assert message["content"] == "file contents"
 
 
-def test_format_tools():
+def test_format_tools(output_budget):
     class FakeTool(BaseTool):
         @property
         def name(self):
@@ -151,6 +161,7 @@ def test_format_tools():
     llm = LocalLLM(
         base_url="http://test/v1",
         model="test-model",
+        output_budget=output_budget,
     )
     formatted = llm._format_tools([FakeTool()])
     
@@ -169,10 +180,11 @@ def test_format_tools():
     }
 
 
-def test_parse_tool_calls():
+def test_parse_tool_calls(output_budget):
     llm = LocalLLM(
         base_url="http://test/v1",
         model="test-model",
+        output_budget=output_budget,
     )
 
     function = MagicMock()
@@ -201,10 +213,11 @@ def test_parse_tool_calls():
     assert error is None
 
 
-def test_build_input_groups_multiple_tool_calls():
+def test_build_input_groups_multiple_tool_calls(output_budget):
     llm = LocalLLM(
         base_url="http://test/v1",
         model="test-model",
+        output_budget=output_budget,
     )
 
     tool_calls = [
@@ -234,10 +247,11 @@ def test_build_input_groups_multiple_tool_calls():
 
 
 @pytest.mark.parametrize("arguments", [None, 123, {}, []])
-def test_parse_tool_calls_rejects_non_string_arguments(arguments):
+def test_parse_tool_calls_rejects_non_string_arguments(arguments, output_budget):
     llm = LocalLLM(
         base_url="http://test/v1",
         model="test-model",
+        output_budget=output_budget,
     )
 
     function = MagicMock()
@@ -255,3 +269,37 @@ def test_parse_tool_calls_rejects_non_string_arguments(arguments):
 
     assert tool_calls == []
     assert error == "Invalid tool arguments for read_file"
+
+
+def test_local_llm_truncates_oversized_tool_result_at_serialization():
+    budget = OutputBudget(max_chars=20)
+
+    local_llm = LocalLLM("https://test/v1", "test-model", output_budget=budget)
+
+    tool_result = ToolResult(
+        call_id="call_123",
+        tool_name="read_file",
+        result="x" * 30,
+        is_error=False
+    )
+
+    content = local_llm._build_input([tool_result])
+
+    assert content[-1]["content"] == "x" * 8 + "\n[truncated]"
+    assert tool_result.result == "x" * 30
+    assert content[-1]["tool_call_id"] == "call_123"
+
+
+def test_local_llm_does_not_truncate_regular_messages():
+    budget = OutputBudget(max_chars=20)
+
+    local_llm = LocalLLM("https://test/v1", "test-model", output_budget=budget)
+
+    message = Message(
+        role="user",
+        content="x" * 30,
+    )
+
+    result = local_llm._build_input([message])
+
+    assert result[0]["content"] == "x" * 30

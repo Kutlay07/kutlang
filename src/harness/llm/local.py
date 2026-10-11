@@ -1,12 +1,13 @@
-from openai import OpenAI
 import json
+from openai import OpenAI
 
-from .base_llm import BaseLLM
+from harness.llm.base_llm import BaseLLM
 from harness.agent.agent_response import AgentResponse
 from harness.tools.base_tool import BaseTool
-from .message import Message
+from harness.llm.message import Message
 from harness.agent.tool_call import ToolCall
 from harness.agent.tool_result import ToolResult
+from harness.tools.output_budget import OutputBudget
 
 
 class LocalLLM(BaseLLM):
@@ -14,6 +15,7 @@ class LocalLLM(BaseLLM):
         self, 
         base_url: str,
         model: str,
+        output_budget: OutputBudget,
         ):
         self.base_url = base_url
         self.model = model
@@ -21,6 +23,8 @@ class LocalLLM(BaseLLM):
             base_url=self.base_url,
             api_key="not-needed",
             )
+
+        self.output_budget = output_budget
 
 
     def _build_input(self, conversation):
@@ -60,7 +64,7 @@ class LocalLLM(BaseLLM):
                 messages.append({
                     "role": "tool",
                     "tool_call_id": item.call_id,
-                    "content": item.result,
+                    "content": self.output_budget.enforce_text(item.result),
                 })
 
         flush_tool_calls()

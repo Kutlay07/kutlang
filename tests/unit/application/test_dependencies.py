@@ -10,8 +10,10 @@ from harness.application.dependencies import (
     get_tool_registry,
     get_context_telemetry,
     get_agent_runtime,
+    get_llm,
     READ_FILE_OUTPUT_BUDGET_CHARS,
     SEARCH_OUTPUT_BUDGET_CHARS,
+    TOOL_RESULT_OUTPUT_BUDGET_CHARS,
 )
 from harness.config.settings import Settings
 from harness.context.budgeted_context_assembler import BudgetedContextAssembler
@@ -136,3 +138,10 @@ def test_get_tool_registry_injects_budget_into_search_tool_provider_subclass(mon
     glob = registry.get("glob")
 
     assert glob.output_budget.max_chars == SEARCH_OUTPUT_BUDGET_CHARS
+
+
+def test_get_llm_configures_output_budget():
+    llm = get_llm(settings)
+
+    assert isinstance(llm, LocalLLM)
+    assert llm.output_budget.max_chars == TOOL_RESULT_OUTPUT_BUDGET_CHARS
