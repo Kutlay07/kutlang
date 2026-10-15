@@ -1,7 +1,9 @@
+from dataclasses import dataclass
 from unittest.mock import MagicMock
 
 import pytest
 
+from harness.context.tool_section_producer import ToolSectionProducer
 from harness.llm.base_llm import BaseLLM
 from harness.observability.audit_emitter import AuditEmitter
 from harness.policy.approval_broker import ApprovalBroker
@@ -46,8 +48,21 @@ class FakeAssembler:
 def context_assembler():
     return FakeAssembler()
 
+@dataclass
+class FakeSection:
+    kind: str
+    content: str
+    priority: int
+    estimated_tokens: int
+
 class FakeHistoryProducer:
-    def __init__(self, section=None):
+    def __init__(self, section=FakeSection(
+        kind="history",
+        content="content",
+        priority=90,
+        estimated_tokens=1,
+        )
+    ):
         self.calls = []
         self.section = section
 
@@ -58,3 +73,9 @@ class FakeHistoryProducer:
 @pytest.fixture
 def history_producer():
     return FakeHistoryProducer()
+
+@pytest.fixture
+def tool_section_producer():
+    producer = MagicMock(spec=ToolSectionProducer)
+    producer.produce.return_value = None
+    return producer

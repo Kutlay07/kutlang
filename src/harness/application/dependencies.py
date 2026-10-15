@@ -9,6 +9,8 @@ from harness.context.context_telemetry import ContextTelemetry
 from harness.context.history_section_producer import HistorySectionProducer
 from harness.context.logging_context_telemetry import LoggingContextTelemetry
 from harness.context.section_producer import ConversationSectionProducer
+from harness.context.tool_definition_section_producer import ToolDefinitionSectionProducer
+from harness.context.tool_section_producer import ToolSectionProducer
 from harness.llm.base_llm import BaseLLM
 from harness.llm.local import LocalLLM
 from harness.policy.approval_broker import ApprovalBroker
@@ -80,7 +82,7 @@ def get_tool_registry(
         if issubclass(provider_class, SearchToolProvider):
             providers.append(
                 provider_class(
-                    boundary, 
+                    boundary,
                     search_visibility,
                     output_budget,
                     )
@@ -96,7 +98,7 @@ def get_tool_registry(
             providers.append(provider_class(boundary))
         else:
             providers.append(provider_class())
-            
+
     registrations = []
 
     for provider in providers:
@@ -104,7 +106,7 @@ def get_tool_registry(
             trust_level = TrustLevel.TRUSTED
         else:
             trust_level = TrustLevel.UNKNOWN
-            
+
         for tool in provider.get_tools():
             registrations.append(
                 ToolRegistration(
@@ -189,6 +191,8 @@ def get_conversation_section_producer() -> ConversationSectionProducer:
         max_chars=TOOL_RESULT_OUTPUT_BUDGET_CHARS
     ))
 
+def get_tool_section_producer() -> ToolSectionProducer:
+    return ToolDefinitionSectionProducer()
 
 def get_agent_runtime(
     llm: BaseLLM = Depends(get_llm),
@@ -198,6 +202,7 @@ def get_agent_runtime(
     audit_emitter: AuditEmitter = Depends(get_audit_emitter),
     context_assembler: ContextAssembler = Depends(get_context_assembler),
     conversation_section_producer: ConversationSectionProducer = Depends(get_conversation_section_producer),
+    tool_section_producer: ToolSectionProducer = Depends(get_tool_section_producer),
     settings: Settings = Depends(get_settings),
 ) -> AgentRuntime:
     return AgentRuntime(
@@ -208,5 +213,6 @@ def get_agent_runtime(
         audit_emitter=audit_emitter,
         context_assembler=context_assembler,
         conversation_section_producer=conversation_section_producer,
+        tool_section_producer=tool_section_producer,
         max_iterations=settings.max_iterations,
     )

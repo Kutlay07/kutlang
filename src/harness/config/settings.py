@@ -10,5 +10,5 @@ class Settings(BaseSettings):
     max_iterations: int
     workspace_root: Path
     max_context_tokens: int = Field(default=8000, gt=0)
-    
+
     model_config = SettingsConfigDict(env_file='.env')

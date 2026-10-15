@@ -6,6 +6,10 @@ from unittest.mock import MagicMock
 
 from harness.agent.agent_response import AgentResponse
 from harness.agent.agent_runtime import AgentRuntime
+from harness.context.budgeted_context_assembler import BudgetedContextAssembler
+from harness.context.history_section_producer import HistorySectionProducer
+from harness.context.tool_definition_section_producer import ToolDefinitionSectionProducer
+from harness.context.tool_section_producer import ToolSectionProducer
 from harness.llm.base_llm import BaseLLM
 from harness.observability.audit_emitter import AuditEmitter
 from harness.observability.audit_event_type import AuditEventType
@@ -21,6 +25,7 @@ from harness.policy.policy_evaluation import PolicyEvaluation
 from harness.policy.risk_level import RiskLevel
 from harness.policy.trust_level import TrustLevel
 from harness.tools.execution.process_terminator import ProcessTerminator
+from harness.tools.output_budget import OutputBudget
 from harness.tools.tool_registration import ToolRegistration
 from harness.tools.tool_registry import ToolRegistry
 from harness.agent.tool_call import ToolCall
@@ -75,8 +80,21 @@ class FakeAssembler:
 def context_assembler():
     return FakeAssembler()
 
+@dataclass
+class FakeSection:
+    kind: str
+    content: str
+    priority: int
+    estimated_tokens: int
+
 class FakeHistoryProducer:
-    def __init__(self, section=None):
+    def __init__(self, section=FakeSection(
+        kind="history",
+        content="content",
+        priority=90,
+        estimated_tokens=1,
+        )
+    ):
         self.calls = []
         self.section = section
 
@@ -89,9 +107,16 @@ def history_producer():
     return FakeHistoryProducer()
 
 @pytest.fixture
-def runtime(llm, tools, policy_engine, 
-            approval_broker, audit_emitter, 
+def tool_section_producer():
+    producer = MagicMock(spec=ToolSectionProducer)
+    producer.produce.return_value = None
+    return producer
+
+@pytest.fixture
+def runtime(llm, tools, policy_engine,
+            approval_broker, audit_emitter,
             context_assembler, history_producer,
+            tool_section_producer,
             ):
     return AgentRuntime(
         llm,
@@ -101,6 +126,7 @@ def runtime(llm, tools, policy_engine,
         audit_emitter,
         context_assembler,
         conversation_section_producer=history_producer,
+        tool_section_producer=tool_section_producer,
     )
 
 
@@ -113,7 +139,7 @@ def test_runtime_initializes_with_llm_and_tools(runtime, llm, tools):
 async def test_runtime_runs_llm(runtime, llm, tools):
     tool = MagicMock(spec=SyncBaseTool)
     tool.name = "read_file"
-    
+
     tools.tools = [tool]
 
     response = AgentResponse(text="Hello world")
@@ -130,7 +156,7 @@ async def test_runtime_runs_llm(runtime, llm, tools):
         ],
         [tool],
     )
-    
+
     assert result is response
 
 
@@ -138,7 +164,7 @@ async def test_runtime_runs_llm(runtime, llm, tools):
 async def test_runtime_executes_tool_calls(
     llm,
     tools,
-    policy_engine, 
+    policy_engine,
     approval_broker,
     runtime
     ):
@@ -151,7 +177,7 @@ async def test_runtime_executes_tool_calls(
         decision=PolicyDecision.ALLOW,
         risk_level=RiskLevel.LOW,
     )
-    
+
     tool_call = ToolCall(
         call_id="call_123",
         name="read_file",
@@ -172,12 +198,12 @@ async def test_runtime_executes_tool_calls(
 
 @pytest.mark.asyncio
 async def test_runtime_sends_tool_result_back_to_llm(
-    runtime, 
-    llm, 
-    tools, 
+    runtime,
+    llm,
+    tools,
     policy_engine
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ALLOW,
         risk_level=RiskLevel.LOW,
@@ -231,16 +257,16 @@ async def test_runtime_sends_tool_result_back_to_llm(
 @pytest.mark.asyncio
 async def test_runtime_supports_multiple_tool_iterations(
     runtime,
-    llm, 
+    llm,
     tools,
     policy_engine,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
     decision=PolicyDecision.ALLOW,
     risk_level=RiskLevel.LOW,
     )
-    
+
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.side_effect = [
         "first result",
@@ -279,7 +305,7 @@ async def test_runtime_supports_multiple_tool_iterations(
 
 @pytest.mark.asyncio
 async def test_runtime_raises_when_max_iterations_exceeded(
-    llm, 
+    llm,
     tools,
     policy_engine,
     approval_broker,
@@ -309,12 +335,12 @@ async def test_runtime_raises_when_max_iterations_exceeded(
 
 @pytest.mark.asyncio
 async def test_runtime_returns_tool_error_as_tool_result(
-    runtime, 
+    runtime,
     llm,
     tools,
     policy_engine,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ALLOW,
         risk_level=RiskLevel.LOW,
@@ -366,17 +392,17 @@ def test_tool_result_can_represent_error():
 
 @pytest.mark.asyncio
 async def test_runtime_handles_unknown_tool(
-    runtime, 
-    llm, 
+    runtime,
+    llm,
     tools,
     policy_engine
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ALLOW,
         risk_level=RiskLevel.LOW,
         )
-    
+
     tools.get.side_effect = KeyError("unknown_tool")
 
     tool_call = ToolCall(
@@ -408,16 +434,16 @@ async def test_runtime_handles_unknown_tool(
 @pytest.mark.asyncio
 async def test_runtime_formats_tool_errors_as_errors(
     runtime,
-    llm, 
+    llm,
     tools,
     policy_engine,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ALLOW,
         risk_level=RiskLevel.LOW,
     )
-    
+
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.side_effect = FileNotFoundError("File not found")
     tools.get.return_value = tool
@@ -450,17 +476,17 @@ async def test_runtime_formats_tool_errors_as_errors(
 
 @pytest.mark.asyncio
 async def test_runtime_preserves_tool_call_id(
-    runtime, 
-    llm, 
+    runtime,
+    llm,
     tools,
     policy_engine,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ALLOW,
         risk_level=RiskLevel.LOW,
     )
-    
+
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
@@ -488,27 +514,27 @@ async def test_runtime_preserves_tool_call_id(
 
 @pytest.mark.asyncio
 async def test_runtime_preserves_assistant_text_with_tool_calls(
-    runtime, 
-    llm, 
+    runtime,
+    llm,
     tools,
     policy_engine,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ALLOW,
         risk_level=RiskLevel.LOW,
     )
-    
+
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
-    
+
     tool_call = ToolCall(
         call_id="call_123",
         name="read_file",
         arguments={"path": "main.py"},
     )
-    
+
     llm.generate.side_effect = [
         AgentResponse(
             text="I will read the file first.",
@@ -516,30 +542,30 @@ async def test_runtime_preserves_assistant_text_with_tool_calls(
         ),
         AgentResponse(text="Here is the file."),
     ]
-    
+
     await runtime.run("Read main.py")
-    
+
     second_conversation = llm.generate.call_args_list[1].args[0]
-    
+
     assert second_conversation[0] == Message(
         role="user",
         content="Read main.py",
     )
-    
+
     assert second_conversation[1] == Message(
         role="assistant",
         content="I will read the file first.",
     )
-    
+
     assert second_conversation[2] == tool_call
-    
+
     assert second_conversation[3].tool_name == "read_file"
     assert second_conversation[3].result == "file contents"
 
 
 def test_execution_tools_can_be_registered_together():
     manager = ProcessManager()
-    
+
     tools = [
         ToolRegistration(
             tool=RunCommandTool(ProcessTerminator()),
@@ -558,9 +584,9 @@ def test_execution_tools_can_be_registered_together():
             trust_level=TrustLevel.TRUSTED,
         ),
     ]
-    
+
     registry = ToolRegistry(tools)
-    
+
     assert registry.get("run_command") is tools[0].tool
     assert registry.get("run_background_command") is tools[1].tool
     assert registry.get("get_process_output") is tools[2].tool
@@ -615,29 +641,29 @@ async def test_runtime_executes_tool_when_approval_is_granted(
     approval_broker,
     runtime,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ASK,
         risk_level=RiskLevel.HIGH,
         approval_scope=ApprovalScope.SINGLE_CALL
     )
-    
+
     approval_broker.request_approval.return_value = ApprovalResult.GRANTED
-    
+
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
-    
+
     tool_call = ToolCall(
         call_id="call_123",
         name="read_file",
         arguments={"path": "main.py"},
     )
-    
+
     results = await runtime._execute_tool_calls(
         AgentResponse(tool_calls=[tool_call])
     )
-    
+
     assert len(results) == 1
     assert results[0].call_id == "call_123"
     assert results[0].tool_name == "read_file"
@@ -654,29 +680,29 @@ async def test_runtime_does_not_execute_tool_when_approval_expires(
     approval_broker,
     runtime,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ASK,
         risk_level=RiskLevel.HIGH,
         approval_scope=ApprovalScope.SINGLE_CALL
     )
-    
+
     approval_broker.request_approval.return_value = ApprovalResult.EXPIRED
-    
+
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
-    
+
     tool_call = ToolCall(
         call_id="call_123",
         name="read_file",
         arguments={"path": "main.py"},
     )
-    
+
     results = await runtime._execute_tool_calls(
         AgentResponse(tool_calls=[tool_call])
     )
-    
+
     assert len(results) == 1
     assert results[0].call_id == "call_123"
     assert results[0].tool_name == "read_file"
@@ -694,29 +720,29 @@ async def test_runtime_does_not_execute_tool_when_approval_is_canceled(
     approval_broker,
     runtime,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ASK,
         risk_level=RiskLevel.HIGH,
         approval_scope=ApprovalScope.SINGLE_CALL
     )
-    
+
     approval_broker.request_approval.return_value = ApprovalResult.CANCELED
-    
+
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
-    
+
     tool_call = ToolCall(
         call_id="call_123",
         name="read_file",
         arguments={"path": "main.py"},
     )
-    
+
     results = await runtime._execute_tool_calls(
         AgentResponse(tool_calls=[tool_call])
     )
-    
+
     assert len(results) == 1
     assert results[0].call_id == "call_123"
     assert results[0].tool_name == "read_file"
@@ -734,17 +760,17 @@ async def test_runtime_denies_tool_execution_when_policy_denies(
     approval_broker,
     runtime,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.DENY,
         risk_level=RiskLevel.HIGH,
         approval_scope=None,
     )
-    
+
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
-    
+
     tool_call = ToolCall(
         call_id="call_123",
         name="read_file",
@@ -754,7 +780,7 @@ async def test_runtime_denies_tool_execution_when_policy_denies(
     results = await runtime._execute_tool_calls(
         AgentResponse(tool_calls=[tool_call])
     )
-    
+
     assert len(results) == 1
     assert results[0].call_id == "call_123"
     assert results[0].tool_name == "read_file"
@@ -772,32 +798,32 @@ async def test_runtime_does_not_execute_tool_while_approval_is_pending(
     approval_broker,
     runtime,
     ):
-    
+
     approval_event = asyncio.Event()
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ASK,
         risk_level=RiskLevel.HIGH,
         approval_scope=ApprovalScope.SINGLE_CALL,
     )
-    
+
     async def request_approval(approval_request):
         await approval_event.wait()
         return ApprovalResult.GRANTED
-    
+
     approval_broker.request_approval.side_effect = request_approval
-    
+
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
-    
+
     tool_call = ToolCall(
         call_id="call_123",
         name="read_file",
         arguments={"path": "main.py"},
     )
-    
-    
+
+
     task = asyncio.create_task(
         runtime._execute_tool_calls(
             AgentResponse(tool_calls=[tool_call])
@@ -805,11 +831,11 @@ async def test_runtime_does_not_execute_tool_while_approval_is_pending(
     )
     await asyncio.sleep(0)
     tool.execute.assert_not_called()
-    
+
     approval_event.set()
-    
+
     results = await task
-    
+
     assert len(results) == 1
     assert results[0].call_id == "call_123"
     assert results[0].tool_name == "read_file"
@@ -827,32 +853,32 @@ async def test_runtime_emits_policy_evaluation_audit_event(
     policy_engine,
     audit_emitter,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ALLOW,
         risk_level=RiskLevel.LOW,
     )
-    
+
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
-    
+
     tool_call = ToolCall(
         call_id="call_123",
         name="read_file",
         arguments={"path": "main.py"},
     )
-    
+
     await runtime._execute_tool_calls(
         AgentResponse(tool_calls=[tool_call])
     )
     events = [call.args[0] for call in audit_emitter.emit.call_args_list]
-    
+
     policy_event = next(
         event for event in events
         if event.event_type == AuditEventType.POLICY_EVALUATED
     )
-    
+
     assert policy_event.outcome == AuditOutcome.SUCCESS
     assert policy_event.tool_call_id == "call_123"
     assert policy_event.tool_name == "read_file"
@@ -868,41 +894,41 @@ async def test_runtime_emits_allow_tool_lifecycle(
     policy_engine,
     audit_emitter,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ALLOW,
         risk_level=RiskLevel.LOW,
     )
-    
+
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
-    
+
     tool_call = ToolCall(
         call_id="call_123",
         name="read_file",
         arguments={"path": "main.py"},
     )
-    
+
     await runtime._execute_tool_calls(
         AgentResponse(tool_calls=[tool_call])
     )
     events = [call.args[0] for call in audit_emitter.emit.call_args_list]
-    
+
     event_types = [event.event_type for event in events]
-    
+
     invocation_event = next(
         event
         for event in events
         if event.event_type == AuditEventType.TOOL_INVOKED
         )
-    
+
     assert event_types == [
     AuditEventType.POLICY_EVALUATED,
     AuditEventType.TOOL_INVOKED,
     AuditEventType.TOOL_COMPLETED,
     ]
-    
+
     assert invocation_event.payload.arguments == {
         "path": "main.py",
     }
@@ -917,32 +943,32 @@ async def test_runtime_emits_ask_granted_lifecycle(
     approval_broker,
     audit_emitter,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ASK,
         risk_level=RiskLevel.HIGH,
         approval_scope=ApprovalScope.SINGLE_CALL,
     )
-    
+
     approval_broker.request_approval.return_value = ApprovalResult.GRANTED
-    
+
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
-    
+
     tool_call = ToolCall(
         call_id="call_123",
         name="read_file",
         arguments={"path": "main.py"},
     )
-    
+
     await runtime._execute_tool_calls(
         AgentResponse(tool_calls=[tool_call])
     )
     events = [call.args[0] for call in audit_emitter.emit.call_args_list]
-    
+
     event_types = [event.event_type for event in events]
-    
+
     assert event_types == [
         AuditEventType.POLICY_EVALUATED,
         AuditEventType.APPROVAL_REQUESTED,
@@ -961,38 +987,38 @@ async def test_runtime_emits_ask_rejected_lifecycle(
     approval_broker,
     audit_emitter,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ASK,
         risk_level=RiskLevel.HIGH,
         approval_scope=ApprovalScope.SINGLE_CALL,
     )
-    
+
     approval_broker.request_approval.return_value = ApprovalResult.REJECTED
-    
+
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
-    
+
     tool_call = ToolCall(
         call_id="call_123",
         name="read_file",
         arguments={"path": "main.py"},
     )
-    
+
     await runtime._execute_tool_calls(
         AgentResponse(tool_calls=[tool_call])
     )
     events = [call.args[0] for call in audit_emitter.emit.call_args_list]
-    
+
     event_types = [event.event_type for event in events]
-    
+
     assert event_types == [
         AuditEventType.POLICY_EVALUATED,
         AuditEventType.APPROVAL_REQUESTED,
         AuditEventType.APPROVAL_COMPLETED,
     ]
-    
+
     tool.execute.assert_not_called()
 
 
@@ -1004,30 +1030,30 @@ async def test_runtime_emits_allow_tool_execution_failure_lifecycle(
     policy_engine,
     audit_emitter,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ALLOW,
         risk_level=RiskLevel.LOW,
     )
-    
+
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.side_effect = RuntimeError("boom")
     tools.get.return_value = tool
-    
+
     tool_call = ToolCall(
         call_id="call_123",
         name="read_file",
         arguments={"path": "main.py"},
     )
-    
+
     results = await runtime._execute_tool_calls(
         AgentResponse(tool_calls=[tool_call])
     )
-    
+
     events = [call.args[0] for call in audit_emitter.emit.call_args_list]
-    
+
     event_types = [event.event_type for event in events]
-    
+
     failure_event = next(
         event
         for event in events
@@ -1054,28 +1080,28 @@ async def test_audit_failure_must_not_change_tool_execution_semantics(
     policy_engine,
     audit_emitter,
     ):
-    
+
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ALLOW,
         risk_level=RiskLevel.LOW,
     )
-    
+
     tool = MagicMock(spec=SyncBaseTool)
     tool.execute.return_value = "file contents"
     tools.get.return_value = tool
-    
+
     audit_emitter.emit.side_effect = RuntimeError("audit failure")
-    
+
     tool_call = ToolCall(
         call_id="call_123",
         name="read_file",
         arguments={"path": "main.py"},
     )
-    
+
     results = await runtime._execute_tool_calls(
         AgentResponse(tool_calls=[tool_call])
     )
-    
+
     events = [call.args[0] for call in audit_emitter.emit.call_args_list]
 
     event_types = [event.event_type for event in events]
@@ -1085,16 +1111,9 @@ async def test_audit_failure_must_not_change_tool_execution_semantics(
     assert results[0].result == "file contents"
 
 
-@dataclass
-class FakeSection:
-    kind: str
-    content: str
-    priority: int
-    estimated_tokens: int
-
 @pytest.mark.asyncio
 async def test_runtime_passes_sections_to_assembler(
-    runtime, llm, context_assembler,
+    runtime, llm, context_assembler, history_producer
 ):
     llm.generate.return_value = AgentResponse(text="ok")
     section = FakeSection(
@@ -1106,23 +1125,27 @@ async def test_runtime_passes_sections_to_assembler(
 
     await runtime.run("Hello", context_sections=[section])
 
-    assert len(context_assembler.calls) == 1
+    assert len(context_assembler.calls) == 2
     assert context_assembler.calls[0] == [section]
+    assert context_assembler.calls[1] == [history_producer.section]
 
 
 @pytest.mark.asyncio
 async def test_runtime_uses_assembler_output_in_prompt(
-    runtime, llm, context_assembler,
+    runtime, llm, context_assembler, history_producer,
 ):
     llm.generate.return_value = AgentResponse(text="ok")
     assembled = FakeSection(
         kind="history", content="ASSEMBLED CONTEXT",
         priority=1, estimated_tokens=10)
 
-    context_assembler.result = [assembled]
+    context_assembler.responses = [
+        [assembled],
+        [history_producer.section],
+    ]
 
     await runtime.run("Hello", context_sections=[FakeSection(
-        kind="raw", content="raw", 
+        kind="raw", content="raw",
         priority=2, estimated_tokens=5)])
 
     first_message = llm.generate.call_args.args[0][0]
@@ -1131,7 +1154,7 @@ async def test_runtime_uses_assembler_output_in_prompt(
 
 
 @pytest.mark.asyncio
-async def test_runtime_does_not_produce_history_for_initial_prompt(
+async def test_runtime_checks_initial_prompt_against_context_budget(
     runtime, llm, context_assembler, history_producer,
 ):
     llm.generate.return_value = AgentResponse(text="ok")
@@ -1146,10 +1169,9 @@ async def test_runtime_does_not_produce_history_for_initial_prompt(
     history_producer.section = section
 
     await runtime.run("Hello")
-    
 
-    assert len(history_producer.calls) == 0
-    assert len(context_assembler.calls) == 0
+    assert history_producer.calls == [[Message(role="user", content="Hello")]]
+    assert context_assembler.calls == [[section]]
 
 
 @pytest.mark.asyncio
@@ -1183,17 +1205,17 @@ async def test_runtime_produces_history_on_subsequent_iteration(
 
     await runtime.run("Do the task")
 
-    assert len(history_producer.calls) == 1
-    assert history_producer.calls[0] == [
+    assert len(history_producer.calls) == 2
+    assert history_producer.calls[1] == [
         Message(role="user", content="Do the task"),
-        tool_call, 
+        tool_call,
         ToolResult(
             call_id="call_123",
             tool_name="read_file",
             result="file contents"
             )
         ]
-    assert context_assembler.calls == [[history_producer.section]]
+    assert context_assembler.calls == [[history_producer.section], [history_producer.section]]
 
 
 def test_drop_oldest_round_removes_assistant_message(runtime):
@@ -1270,14 +1292,111 @@ async def test_run_trims_history_until_section_fits(
 
     history_producer.section = section
 
-    context_assembler.responses = [[], [section]]
+    context_assembler.responses = [[section], [section], [], [section]]
 
     await runtime.run("Read the file")
 
-    assert len(history_producer.calls) == 2
-    assert history_producer.calls[0] == [user, tc1, tr1]
-    assert history_producer.calls[1] == [user, tc2, tr2]
-    assert len(context_assembler.calls) == 2
-    assert context_assembler.calls == [[section], [section]]
-    assert context_assembler.calls[0][0] is section
+    assert len(history_producer.calls) == 4
+    assert history_producer.calls[1] == [user, tc1, tr1]
+    assert history_producer.calls[3] == [user, tc2, tr2]
+    assert len(context_assembler.calls) == 4
+    assert context_assembler.calls == [[section], [section], [section], [section]]
+    assert context_assembler.calls[1][0] is section
     assert llm.generate.call_args_list[2].args[0] == [user, tc2, tr2]
+
+
+@pytest.mark.asyncio
+async def test_runtime_rejects_oversized_initial_prompt_before_llm_call(
+    runtime, llm
+):
+    runtime.context_assembler = BudgetedContextAssembler(max_tokens=10)
+    runtime.conversation_section_producer = HistorySectionProducer(OutputBudget(max_chars=20_000))
+    llm.generate.return_value = AgentResponse(text="ok")
+
+    with pytest.raises(ValueError, match="Context budget exceeded"):
+        await runtime.run("x" * 100)
+
+    llm.generate.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_runtime_rejects_oversized_tool_definition_before_llm_call(
+    llm, tools, runtime,
+):
+    runtime.context_assembler = BudgetedContextAssembler(max_tokens=10)
+    runtime.conversation_section_producer = HistorySectionProducer(OutputBudget(max_chars=20_000))
+    runtime.tool_section_producer = ToolDefinitionSectionProducer()
+
+    tool = MagicMock(spec=SyncBaseTool)
+    tool.name = "read_file"
+    tool.description = "x" * 1_000
+    tool.parameters = {"type": "object", "properties": {}}
+    tools.tools = [tool]
+
+    llm.generate.return_value = AgentResponse(text="ok")
+
+    with pytest.raises(ValueError, match="Context budget exceeded"):
+        await runtime.run("Hi")
+
+    llm.generate.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_runtime_rejects_combined_history_and_tool_definitions_over_budget(
+    llm, history_producer, tool_section_producer, runtime,
+):
+    runtime.context_assembler = BudgetedContextAssembler(max_tokens=10)
+    history_producer.section = FakeSection(
+        kind="history", content="hello", priority=90, estimated_tokens=6,
+    )
+    tool_section_producer.produce.return_value = FakeSection(
+        kind="tool_definitions", content="tool", priority=10, estimated_tokens=6,
+    )
+
+    with pytest.raises(ValueError, match="Context budget exceeded"):
+        await runtime.run("hello")
+
+    llm.generate.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_runtime_trims_history_when_tool_definitions_exceed_combined_budget(
+    llm, tools, policy_engine, tool_section_producer, runtime,
+):
+    policy_engine.evaluate.return_value = PolicyEvaluation(
+        decision=PolicyDecision.ALLOW,
+        risk_level=RiskLevel.LOW,
+    )
+
+    runtime.conversation_section_producer = HistorySectionProducer(
+        OutputBudget(max_chars=20_000)
+    )
+    tool_section_producer.produce.return_value = FakeSection(
+        kind="tool_definitions", content="tool", priority=10, estimated_tokens=6,
+    )
+
+    tool = MagicMock(spec=SyncBaseTool)
+    tool.execute.return_value = "x" * 200
+    tools.get.return_value = tool
+
+    user = Message(role="user", content="Read the file")
+    tool_call = ToolCall(call_id="call_1", name="read_file", arguments={"path": "main.py"})
+    tool_result = ToolResult(call_id="call_1", tool_name="read_file", result="x" * 200)
+
+    llm.generate.side_effect = [
+        AgentResponse(tool_calls=[tool_call]),
+        AgentResponse(text="Done"),
+    ]
+
+    history_section = runtime.conversation_section_producer.produce(
+        [user, tool_call, tool_result]
+    )
+    runtime.context_assembler = BudgetedContextAssembler(
+        max_tokens=history_section.estimated_tokens
+        )
+
+    await runtime.run("Read the file")
+
+    assert llm.generate.call_count == 2
+    assert llm.generate.call_args_list[1].args[0] == [user]
+    assert llm.generate.call_args_list[1].args[1] is tools.tools

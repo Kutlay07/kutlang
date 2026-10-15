@@ -18,7 +18,7 @@ from harness.tools.sync_base_tool import SyncBaseTool
 
 @pytest.mark.asyncio
 async def test_runtime_keeps_oversized_tool_result_after_history_budgeting(
-    llm, tools, policy_engine, approval_broker, audit_emitter,
+    llm, tools, policy_engine, approval_broker, audit_emitter, tool_section_producer,
 ):
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ALLOW,
@@ -49,6 +49,7 @@ async def test_runtime_keeps_oversized_tool_result_after_history_budgeting(
         audit_emitter,
         context_assembler,
         conversation_section_producer,
+        tool_section_producer,
     )
 
     await runtime.run("Read the file")

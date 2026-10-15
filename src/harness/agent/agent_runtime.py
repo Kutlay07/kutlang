@@ -6,6 +6,7 @@ from harness.agent.tool_result import ToolResult
 from harness.context.context_assembler import ContextAssembler
 from harness.context.context_section import ContextSection
 from harness.context.section_producer import ConversationSectionProducer
+from harness.context.tool_section_producer import ToolSectionProducer
 from harness.llm.base_llm import BaseLLM, ConversationItem
 from harness.llm.message import Message
 from harness.observability.approval_audit_data import ApprovalAuditData
@@ -54,6 +55,7 @@ class AgentRuntime:
         audit_emitter: AuditEmitter,
         context_assembler: ContextAssembler,
         conversation_section_producer: ConversationSectionProducer,
+        tool_section_producer: ToolSectionProducer,
         max_iterations: int = 10,
     ):
         self.llm = llm
@@ -64,10 +66,11 @@ class AgentRuntime:
         self.audit_emitter = audit_emitter
         self.context_assembler = context_assembler
         self.conversation_section_producer = conversation_section_producer
+        self.tool_section_producer = tool_section_producer
 
 
     async def run(
-        self, 
+        self,
         prompt: str,
         context_sections: list[ContextSection] | None = None
     ) -> AgentResponse:
@@ -82,24 +85,37 @@ class AgentRuntime:
         ]
 
         for _ in range(self.max_iterations):
-            section = None
-            while len(conversation) > 1:
+            available_tools = self.tools.tools
+            tool_section = self.tool_section_producer.produce(available_tools)
+
+            while True:
                 candidate = self.conversation_section_producer.produce(conversation)
-
                 if candidate is None:
+                    raise RuntimeError("Non-empty conversation produced no section")
+
+                sections = [candidate]
+
+                if tool_section is not None:
+                    sections.append(tool_section)
+
+                kept = self.context_assembler.assemble(sections)
+
+                if tool_section is not None and tool_section not in kept:
+                    raise ValueError("Context budget exceeded")
+
+                if candidate in kept:
                     break
 
-                kept = self.context_assembler.assemble([candidate])
-                if kept:
-                    break
+                if len(conversation) == 1:
+                    raise ValueError("Context budget exceeded")
 
                 self._drop_oldest_round(conversation)
 
             response = self.llm.generate(
                 conversation.copy(),
-                self.tools.tools,
+                available_tools,
             )
-            
+
             if not response.tool_calls:
                 return response
 
@@ -115,7 +131,7 @@ class AgentRuntime:
 
             conversation.extend(response.tool_calls)
             conversation.extend(results)
-            
+
         raise RuntimeError("Maximum agent iterations exceeded")
 
 
@@ -124,13 +140,13 @@ class AgentRuntime:
         response: AgentResponse,
     ) -> list[ToolResult]:
         results = []
-        
+
         for tool_call in response.tool_calls or []:
             tool_execution_request = ToolExecutionRequest(
                 tool_name=tool_call.name,
                 arguments=ToolArguments(tool_call.arguments),
             )
-            
+
             try:
                 registration = self.tools.get_registration(tool_call.name)
             except KeyError:
@@ -140,12 +156,12 @@ class AgentRuntime:
                 )
                 results.append(result)
                 continue
-            
+
             policy_context = PolicyContext(
                 request=tool_execution_request,
                 trust_level=registration.trust_level,
             )
-            
+
             try:
                 evaluation = self.policy_engine.evaluate(policy_context)
             except Exception as exc:
@@ -155,7 +171,7 @@ class AgentRuntime:
                 )
                 results.append(result)
                 continue
-            
+
             try:
                 self._emit_policy_evaluation_audit(
                     tool_call,
@@ -163,18 +179,18 @@ class AgentRuntime:
                 )
             except Exception:
                 logger.exception("Failed to emit audit event")
-                
+
             if evaluation.decision == PolicyDecision.ALLOW:
                 result = await self._execute_tool_call(tool_call)
                 results.append(result)
-                
+
             elif evaluation.decision == PolicyDecision.ASK:
                 approval_request = ApprovalRequest(
                     tool_execution_request=tool_execution_request,
                     risk_level=evaluation.risk_level,
                     scope=evaluation.approval_scope,
                 )
-                
+
                 try:
                     self._emit_approval_requested_audit(
                         tool_call,
@@ -182,13 +198,13 @@ class AgentRuntime:
                     )
                 except Exception:
                     logger.exception("Failed to emit audit event")
-                    
+
                 approval_result = (
                     await self.approval_broker.request_approval(
                         approval_request
                     )
                 )
-                
+
                 try:
                     self._emit_approval_completed_audit(
                         tool_call,
@@ -197,39 +213,39 @@ class AgentRuntime:
                     )
                 except Exception:
                     logger.exception("Failed to emit audit event")
-                    
+
                 if approval_result == ApprovalResult.GRANTED:
                     result = await self._execute_tool_call(tool_call)
                     results.append(result)
-                    
+
                 elif approval_result == ApprovalResult.REJECTED:
                     result = self._create_tool_failure_result(
                         tool_call,
                         reason="Tool execution rejected by user.",
                     )
                     results.append(result)
-                    
+
                 elif approval_result == ApprovalResult.EXPIRED:
                     result = self._create_tool_failure_result(
                         tool_call,
                         reason="Tool execution approval expired.",
                     )
                     results.append(result)
-                    
+
                 elif approval_result == ApprovalResult.CANCELED:
                     result = self._create_tool_failure_result(
                         tool_call,
                         reason="Tool execution approval cancelled by user.",
                     )
                     results.append(result)
-                    
+
             elif evaluation.decision == PolicyDecision.DENY:
                 result = self._create_tool_failure_result(
                     tool_call,
                     reason="Tool execution denied by policy.",
                 )
                 results.append(result)
-                
+
         return results
 
 
@@ -248,12 +264,12 @@ class AgentRuntime:
                     arguments=tool_call.arguments,
                 ),
             )
-            
+
             self.audit_emitter.emit(audit_event)
-            
+
         except Exception:
             logger.exception("Failed to emit audit event")
-            
+
         try:
             tool = self.tools.get(tool_call.name)
 
@@ -267,7 +283,7 @@ class AgentRuntime:
                 )
 
             is_error = False
-            
+
             try:
                 audit_event = AuditEvent(
                     event_type=AuditEventType.TOOL_COMPLETED,
@@ -279,16 +295,16 @@ class AgentRuntime:
                         result=result,
                     ),
                 )
-                
+
                 self.audit_emitter.emit(audit_event)
-                
+
             except Exception:
                 logger.exception("Failed to emit audit event")
-                
+
         except Exception as exc:
             result = str(exc)
             is_error = True
-            
+
             try:
                 audit_event = AuditEvent(
                     event_type=AuditEventType.TOOL_FAILED,
@@ -301,12 +317,12 @@ class AgentRuntime:
                         error=str(exc),
                     ),
                 )
-                
+
                 self.audit_emitter.emit(audit_event)
-                
+
             except Exception:
                 logger.exception("Failed to emit audit event")
-                
+
         return ToolResult(
             call_id=tool_call.call_id,
             tool_name=tool_call.name,
@@ -337,7 +353,7 @@ class AgentRuntime:
             decision=evaluation.decision,
             risk_level=evaluation.risk_level,
         )
-        
+
         audit_event = AuditEvent(
             event_type=AuditEventType.POLICY_EVALUATED,
             timestamp=datetime.now(timezone.utc),
@@ -346,7 +362,7 @@ class AgentRuntime:
             outcome=AuditOutcome.SUCCESS,
             payload=policy_audit_data,
         )
-        
+
         self.audit_emitter.emit(audit_event)
 
 
@@ -363,7 +379,7 @@ class AgentRuntime:
                 approval_request.scope.value
             ),
         )
-        
+
         audit_event = AuditEvent(
             event_type=AuditEventType.APPROVAL_REQUESTED,
             timestamp=datetime.now(timezone.utc),
@@ -372,7 +388,7 @@ class AgentRuntime:
             outcome=AuditOutcome.PENDING,
             payload=approval_audit_data,
         )
-        
+
         self.audit_emitter.emit(audit_event)
 
 
@@ -433,7 +449,7 @@ class AgentRuntime:
         conversation: list[ConversationItem],
     ) -> None:
         removed = conversation.pop(1)
-        
+
         if isinstance(removed, ToolCall):
             for index, item in enumerate(conversation):
                 if isinstance(item, ToolResult) and item.call_id == removed.call_id:
