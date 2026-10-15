@@ -6,12 +6,13 @@ import pytest
 
 from harness.application.dependencies import (
     get_context_assembler,
-    build_context_assembler, 
+    build_context_assembler,
     get_tool_registry,
     get_context_telemetry,
     get_agent_runtime,
     get_llm,
     get_conversation_section_producer,
+    get_tool_section_producer,
     READ_FILE_OUTPUT_BUDGET_CHARS,
     SEARCH_OUTPUT_BUDGET_CHARS,
     TOOL_RESULT_OUTPUT_BUDGET_CHARS,
@@ -77,6 +78,7 @@ def test_get_agent_runtime_wires_all_dependencies():
     audit_emitter = MagicMock(spec=AuditEmitter)
     assembler = build_context_assembler(settings)
     conversation_section_producer = MagicMock(spec=ConversationSectionProducer)
+    tool_section_producer = get_tool_section_producer()
 
     runtime = get_agent_runtime(
         llm=llm,
@@ -86,6 +88,7 @@ def test_get_agent_runtime_wires_all_dependencies():
         audit_emitter=audit_emitter,
         context_assembler=assembler,
         conversation_section_producer=conversation_section_producer,
+        tool_section_producer=tool_section_producer,
         settings=settings,
     )
 
@@ -95,6 +98,7 @@ def test_get_agent_runtime_wires_all_dependencies():
     assert runtime.approval_broker is approval_broker
     assert runtime.audit_emitter is audit_emitter
     assert runtime.context_assembler is assembler
+    assert runtime.tool_section_producer is tool_section_producer
     assert runtime.max_iterations == settings.max_iterations
 
 

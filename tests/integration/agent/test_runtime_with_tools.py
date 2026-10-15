@@ -29,6 +29,7 @@ async def test_runtime_executes_real_read_file_tool(
     audit_emitter,
     context_assembler,
     history_producer,
+    tool_section_producer,
     ):
 
     policy_engine.evaluate.return_value = PolicyEvaluation(
@@ -70,6 +71,7 @@ async def test_runtime_executes_real_read_file_tool(
         audit_emitter,
         context_assembler,
         history_producer,
+        tool_section_producer,
         )
 
     result = await runtime.run("Read main.py")
@@ -91,6 +93,7 @@ async def test_runtime_handles_real_read_file_error(
     audit_emitter,
     context_assembler,
     history_producer,
+    tool_section_producer,
     ):
 
     policy_engine.evaluate.return_value = PolicyEvaluation(
@@ -131,6 +134,7 @@ async def test_runtime_handles_real_read_file_error(
         audit_emitter,
         context_assembler,
         history_producer,
+        tool_section_producer,
         )
 
     result = await runtime.run("Read missing.py")
@@ -154,6 +158,7 @@ async def test_runtime_executes_multiple_real_tools(
     audit_emitter,
     context_assembler,
     history_producer,
+    tool_section_producer,
     ):
 
     policy_engine.evaluate.return_value = PolicyEvaluation(
@@ -206,6 +211,7 @@ async def test_runtime_executes_multiple_real_tools(
         audit_emitter,
         context_assembler,
         history_producer,
+        tool_section_producer,
         )
 
     result = await runtime.run("Read both files")
@@ -231,6 +237,7 @@ async def test_runtime_executes_real_write_file_tool(
     audit_emitter,
     context_assembler,
     history_producer,
+    tool_section_producer,
     ):
     policy_engine.evaluate.return_value = PolicyEvaluation(
         decision=PolicyDecision.ALLOW,
@@ -272,6 +279,7 @@ async def test_runtime_executes_real_write_file_tool(
         audit_emitter,
         context_assembler,
         history_producer,
+        tool_section_producer,
         )
 
     result = await runtime.run("Create the file")
@@ -296,6 +304,7 @@ async def test_runtime_handles_real_write_file_error(
     audit_emitter,
     context_assembler,
     history_producer,
+    tool_section_producer,
     ):
 
     policy_engine.evaluate.return_value = PolicyEvaluation(
@@ -339,6 +348,7 @@ async def test_runtime_handles_real_write_file_error(
         audit_emitter,
         context_assembler,
         history_producer,
+        tool_section_producer,
         )
 
     result = await runtime.run("Write the file")
@@ -361,6 +371,7 @@ async def test_runtime_executes_real_copy_file_tool(
     audit_emitter,
     context_assembler,
     history_producer,
+    tool_section_producer,
 ):
 
     policy_engine.evaluate.return_value = PolicyEvaluation(
@@ -406,6 +417,7 @@ async def test_runtime_executes_real_copy_file_tool(
         audit_emitter,
         context_assembler,
         history_producer,
+        tool_section_producer,
         )
 
     result = await runtime.run("Copy original.py to copy.py")

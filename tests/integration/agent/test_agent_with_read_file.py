@@ -28,6 +28,7 @@ async def test_agent_runtime_reads_file_with_real_tool(
     audit_emitter,
     context_assembler,
     history_producer,
+    tool_section_producer,
 ):
 
     policy_engine.evaluate.return_value = PolicyEvaluation(
@@ -69,6 +70,7 @@ async def test_agent_runtime_reads_file_with_real_tool(
         audit_emitter,
         context_assembler,
         history_producer,
+        tool_section_producer,
         )
 
     result = await runtime.run("Read the file")
